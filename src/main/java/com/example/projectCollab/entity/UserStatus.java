@@ -4,5 +4,7 @@ public enum UserStatus {
 
     ACTIVE,
     INACTIVE,
-    SUSPENDED
+    SUSPENDED,
+    PENDING_VERIFICATION  // Add this for lecturer verification
+
 }

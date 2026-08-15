@@ -17,6 +17,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -113,12 +114,56 @@ public class AuthService {
         // IMPORTANT:
         // Never allow public registration
         // to choose ADMIN or LECTURER.
-        user.setRole(Role.STUDENT);
+        /*user.setRole(Role.STUDENT);
 
         user.setStatus(UserStatus.ACTIVE);
 
         User savedUser =
                 userRepository.save(user);
+        */
+
+        // ==========================================
+        // ROLE HANDLING WITH VERIFICATION
+        // ==========================================
+
+        Role role;
+        UserStatus status;
+
+        // Check if role is provided and valid
+        String requestedRole = request.role();
+
+        if (requestedRole != null && !requestedRole.isBlank()) {
+            try {
+                role = Role.valueOf(requestedRole.toUpperCase());
+
+                // Security: Only allow STUDENT or LECTURER registration
+                // ADMIN and TEAM_LEADER must be assigned by admin
+                if (role == Role.ADMIN) {
+                    throw new IllegalArgumentException("Cannot register as ADMIN. Contact system administrator.");
+                }
+
+                if (role == Role.LECTURER) {
+                    // Lecturers need admin verification
+                    status = UserStatus.PENDING_VERIFICATION;
+                } else {
+                    // Students are active immediately
+                    status = UserStatus.ACTIVE;
+                }
+            } catch (IllegalArgumentException e) {
+                // Invalid role, default to STUDENT
+                role = Role.STUDENT;
+                status = UserStatus.ACTIVE;
+            }
+        } else {
+            // Default to STUDENT if no role provided
+            role = Role.STUDENT;
+            status = UserStatus.ACTIVE;
+        }
+
+        user.setRole(role);
+        user.setStatus(status);
+
+        User savedUser = userRepository.save(user);
 
         // Create UserDetails
         UserDetails userDetails =
@@ -141,7 +186,8 @@ public class AuthService {
                 savedUser.getUserId(),
                 savedUser.getUsername(),
                 savedUser.getEmail(),
-                savedUser.getRole().name()
+                savedUser.getRole().name(),
+                savedUser.getStatus().name()  // Add this 7th parameter
         );
     }
 
@@ -186,7 +232,8 @@ public class AuthService {
                 user.getUserId(),
                 user.getUsername(),
                 user.getEmail(),
-                user.getRole().name()
+                user.getRole().name(),
+                user.getStatus().name()
         );
     }
 }

@@ -12,7 +12,9 @@ public record AuthResponse(
 
         String email,
 
-        String role
+        String role,
+
+        String status
 
 ) {
 }

@@ -26,6 +26,8 @@ public record RegisterRequest(
 
         String studentId,
 
-        String phone
+        String phone,
+
+        String role
 ) {
 }
