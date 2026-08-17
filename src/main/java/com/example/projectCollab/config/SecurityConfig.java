@@ -81,6 +81,13 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
+                        // Project endpoints - handled by method-level security
+                        .requestMatchers(
+                                "/api/projects/**",
+                                "/api/teams/**",
+                                "/api/invitations/**"
+                        ).authenticated()
+
                         // Everything else requires login
                         .anyRequest().authenticated()
                 )
