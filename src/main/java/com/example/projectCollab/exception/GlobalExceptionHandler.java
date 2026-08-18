@@ -2,9 +2,7 @@ package com.example.projectCollab.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
 import org.springframework.security.authentication.BadCredentialsException;
-
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -19,21 +17,14 @@ public class GlobalExceptionHandler {
     // EMAIL EXISTS
     // ==========================================
 
-    @ExceptionHandler(
-            EmailAlreadyExistsException.class
-    )
-    public ResponseEntity<Map<String, String>>
-    handleEmailExists(
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<Map<String, String>> handleEmailExists(
             EmailAlreadyExistsException ex
     ) {
 
-        Map<String, String> response =
-                new HashMap<>();
+        Map<String, String> response = new HashMap<>();
 
-        response.put(
-                "error",
-                ex.getMessage()
-        );
+        response.put("error", ex.getMessage());
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
@@ -45,21 +36,14 @@ public class GlobalExceptionHandler {
     // BAD LOGIN
     // ==========================================
 
-    @ExceptionHandler(
-            BadCredentialsException.class
-    )
-    public ResponseEntity<Map<String, String>>
-    handleBadCredentials(
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, String>> handleBadCredentials(
             BadCredentialsException ex
     ) {
 
-        Map<String, String> response =
-                new HashMap<>();
+        Map<String, String> response = new HashMap<>();
 
-        response.put(
-                "error",
-                "Invalid email or password"
-        );
+        response.put("error", "Invalid email or password");
 
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
@@ -71,16 +55,12 @@ public class GlobalExceptionHandler {
     // VALIDATION
     // ==========================================
 
-    @ExceptionHandler(
-            MethodArgumentNotValidException.class
-    )
-    public ResponseEntity<Map<String, String>>
-    handleValidation(
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidation(
             MethodArgumentNotValidException ex
     ) {
 
-        Map<String, String> errors =
-                new HashMap<>();
+        Map<String, String> errors = new HashMap<>();
 
         ex.getBindingResult()
                 .getFieldErrors()
@@ -101,21 +81,52 @@ public class GlobalExceptionHandler {
     // ILLEGAL ARGUMENT
     // ==========================================
 
-    @ExceptionHandler(
-            IllegalArgumentException.class
-    )
-    public ResponseEntity<Map<String, String>>
-    handleIllegalArgument(
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalArgument(
             IllegalArgumentException ex
     ) {
 
-        Map<String, String> response =
-                new HashMap<>();
+        Map<String, String> response = new HashMap<>();
 
-        response.put(
-                "error",
-                ex.getMessage()
-        );
+        response.put("error", ex.getMessage());
+
+        return ResponseEntity
+                .badRequest()
+                .body(response);
+    }
+
+
+    // ==========================================
+    // UNAUTHORIZED ACCESS
+    // ==========================================
+
+    @ExceptionHandler(UnauthorizedAccessException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorizedAccess(
+            UnauthorizedAccessException ex
+    ) {
+
+        Map<String, String> response = new HashMap<>();
+
+        response.put("error", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(response);
+    }
+
+
+    // ==========================================
+    // ILLEGAL STATE
+    // ==========================================
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalState(
+            IllegalStateException ex
+    ) {
+
+        Map<String, String> response = new HashMap<>();
+
+        response.put("error", ex.getMessage());
 
         return ResponseEntity
                 .badRequest()

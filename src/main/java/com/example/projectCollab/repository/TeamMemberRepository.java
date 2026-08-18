@@ -64,8 +64,33 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     Optional<TeamMember> findByTeam_TeamIdAndUser_UserId(@Param("teamId") Long teamId,
                                                          @Param("userId") Long userId);
 
-    // Check if a user exists in a team
+    // Check if a user exists in a team (boolean check - more efficient)
     boolean existsByTeam_TeamIdAndUser_UserId(Long teamId, Long userId);
+
+    // ==========================================
+    // ADD THESE METHODS FOR MILESTONE ACCESS
+    // ==========================================
+
+    // Check if a user has an ACTIVE membership in a team
+    @Query("SELECT CASE WHEN COUNT(tm) > 0 THEN true ELSE false END " +
+            "FROM TeamMember tm " +
+            "WHERE tm.team.teamId = :teamId " +
+            "AND tm.user.userId = :userId " +
+            "AND tm.status = 'ACTIVE'")
+    boolean isActiveMember(@Param("teamId") Long teamId, 
+                          @Param("userId") Long userId);
+
+    // Get active team memberships for a user (JOIN FETCH for efficiency)
+    @Query("SELECT tm FROM TeamMember tm " +
+            "JOIN FETCH tm.team t " +
+            "JOIN FETCH t.project p " +
+            "WHERE tm.user.userId = :userId AND tm.status = 'ACTIVE'")
+    List<TeamMember> findActiveTeamsByUserId(@Param("userId") Long userId);
+
+    // Get all teams where user is a member (any status)
+    @Query("SELECT tm.team.teamId FROM TeamMember tm " +
+            "WHERE tm.user.userId = :userId AND tm.status = 'ACTIVE'")
+    List<Long> findActiveTeamIdsByUserId(@Param("userId") Long userId);
 
     // ==========================================
     // COUNT QUERIES
