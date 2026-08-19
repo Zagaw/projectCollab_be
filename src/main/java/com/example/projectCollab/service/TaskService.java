@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,7 +33,7 @@ public class TaskService {
 
         // Validate project exists
         Project project = projectRepository.findById(request.getProjectId())
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + request.getProjectId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Project", "id", request.getProjectId()));
 
         // Build task
         Task task = new Task();
@@ -47,35 +48,37 @@ public class TaskService {
             try {
                 task.setStatus(TaskStatus.valueOf(request.getStatus().toUpperCase()));
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid status: " + request.getStatus());
+                throw new IllegalArgumentException("Invalid status: " + request.getStatus() +
+                        ". Allowed values: TODO, IN_PROGRESS, COMPLETED, BLOCKED, REVIEW");
             }
         }
         if (request.getPriority() != null) {
             try {
                 task.setPriority(TaskPriority.valueOf(request.getPriority().toUpperCase()));
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid priority: " + request.getPriority());
+                throw new IllegalArgumentException("Invalid priority: " + request.getPriority() +
+                        ". Allowed values: LOW, MEDIUM, HIGH, URGENT");
             }
         }
 
         // Set team if provided
         if (request.getTeamId() != null) {
             Team team = teamRepository.findById(request.getTeamId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + request.getTeamId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Team", "id", request.getTeamId()));
             task.setTeam(team);
         }
 
         // Assign to user if provided
         if (request.getAssignedTo() != null) {
             User assignedUser = userRepository.findById(request.getAssignedTo())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getAssignedTo()));
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getAssignedTo()));
             task.setAssignedTo(assignedUser);
         }
 
         // Link to milestone if provided
         if (request.getMilestoneId() != null) {
             Milestone milestone = milestoneRepository.findById(request.getMilestoneId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with id: " + request.getMilestoneId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Milestone", "id", request.getMilestoneId()));
             task.setMilestone(milestone);
         }
 
@@ -85,14 +88,14 @@ public class TaskService {
 
     public TaskResponse getTaskById(Long taskId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
+                .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
         return mapToResponse(task);
     }
 
     public List<TaskResponse> getTasksByProject(Long projectId) {
         // Verify project exists
         if (!projectRepository.existsById(projectId)) {
-            throw new ResourceNotFoundException("Project not found with id: " + projectId);
+            throw new ResourceNotFoundException("Project", "id", projectId);
         }
         return taskRepository.findByProjectProjectId(projectId)
                 .stream()
@@ -103,7 +106,7 @@ public class TaskService {
     public List<TaskResponse> getTasksByTeam(Long teamId) {
         // Verify team exists
         if (!teamRepository.existsById(teamId)) {
-            throw new ResourceNotFoundException("Team not found with id: " + teamId);
+            throw new ResourceNotFoundException("Team", "id", teamId);
         }
         return taskRepository.findByTeamTeamId(teamId)
                 .stream()
@@ -113,7 +116,7 @@ public class TaskService {
 
     public List<TaskResponse> getTasksAssignedToStudent(Long studentId) {
         if (!userRepository.existsById(studentId)) {
-            throw new ResourceNotFoundException("User not found with id: " + studentId);
+            throw new ResourceNotFoundException("User", "id", studentId);
         }
         return taskRepository.findByAssignedToUserId(studentId)
                 .stream()
@@ -123,7 +126,7 @@ public class TaskService {
 
     public List<TaskResponse> getTasksByMilestone(Long milestoneId) {
         if (!milestoneRepository.existsById(milestoneId)) {
-            throw new ResourceNotFoundException("Milestone not found with id: " + milestoneId);
+            throw new ResourceNotFoundException("Milestone", "id", milestoneId);
         }
         return taskRepository.findByMilestoneMilestoneId(milestoneId)
                 .stream()
@@ -150,9 +153,9 @@ public class TaskService {
     @Transactional
     public TaskResponse updateTask(Long taskId, TaskRequest request) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
+                .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
-        // Check authorization - only creator, assigned user, or admin can update
+        // Check authorization
         User currentUser = getCurrentUser();
         validateTaskAccess(task, currentUser);
 
@@ -173,29 +176,31 @@ public class TaskService {
                     task.setCompletedAt(LocalDateTime.now());
                 }
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid status: " + request.getStatus());
+                throw new IllegalArgumentException("Invalid status: " + request.getStatus() +
+                        ". Allowed values: TODO, IN_PROGRESS, COMPLETED, BLOCKED, REVIEW");
             }
         }
         if (request.getPriority() != null) {
             try {
                 task.setPriority(TaskPriority.valueOf(request.getPriority().toUpperCase()));
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid priority: " + request.getPriority());
+                throw new IllegalArgumentException("Invalid priority: " + request.getPriority() +
+                        ". Allowed values: LOW, MEDIUM, HIGH, URGENT");
             }
         }
         if (request.getAssignedTo() != null) {
             User assignedUser = userRepository.findById(request.getAssignedTo())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getAssignedTo()));
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getAssignedTo()));
             task.setAssignedTo(assignedUser);
         }
         if (request.getTeamId() != null) {
             Team team = teamRepository.findById(request.getTeamId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Team not found with id: " + request.getTeamId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Team", "id", request.getTeamId()));
             task.setTeam(team);
         }
         if (request.getMilestoneId() != null) {
             Milestone milestone = milestoneRepository.findById(request.getMilestoneId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Milestone not found with id: " + request.getMilestoneId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Milestone", "id", request.getMilestoneId()));
             task.setMilestone(milestone);
         }
 
@@ -206,7 +211,7 @@ public class TaskService {
     @Transactional
     public TaskResponse updateTaskStatus(Long taskId, String status) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
+                .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
         User currentUser = getCurrentUser();
         validateTaskAccess(task, currentUser);
@@ -215,31 +220,32 @@ public class TaskService {
             TaskStatus newStatus = TaskStatus.valueOf(status.toUpperCase());
             task.setStatus(newStatus);
 
-            // If completed, set completion time
             if (newStatus == TaskStatus.COMPLETED) {
                 task.setCompletedAt(LocalDateTime.now());
             } else {
-                // If status changed from COMPLETED, clear completion time
                 task.setCompletedAt(null);
             }
 
             Task updatedTask = taskRepository.save(task);
             return mapToResponse(updatedTask);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid status: " + status);
+            throw new IllegalArgumentException("Invalid status: " + status +
+                    ". Allowed values: TODO, IN_PROGRESS, COMPLETED, BLOCKED, REVIEW");
         }
     }
 
     @Transactional
     public void deleteTask(Long taskId) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
+                .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
         User currentUser = getCurrentUser();
-        // Only creator or admin can delete
-        if (!task.getCreatedBy().getUserId().equals(currentUser.getUserId()) &&
-                !currentUser.getRole().equals("ADMIN") &&
-                !currentUser.getRole().equals("LECTURER")) {
+
+        // Check if user is creator OR has admin/lecturer role
+        boolean isCreator = task.getCreatedBy().getUserId().equals(currentUser.getUserId());
+        boolean isAdminOrLecturer = currentUser.getRole() == Role.ADMIN || currentUser.getRole() == Role.LECTURER;
+
+        if (!isCreator && !isAdminOrLecturer) {
             throw new UnauthorizedAccessException("You are not authorized to delete this task");
         }
 
@@ -253,10 +259,9 @@ public class TaskService {
             throw new UnauthorizedAccessException("User not authenticated");
         }
 
-        // Assuming your UserDetailsService returns User entity with username field
-        String username = authentication.getName();
-        return userRepository.findByEmail(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        String email = authentication.getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
     }
 
     // Helper method to validate task access
@@ -264,14 +269,14 @@ public class TaskService {
         boolean isCreator = task.getCreatedBy().getUserId().equals(user.getUserId());
         boolean isAssigned = task.getAssignedTo() != null &&
                 task.getAssignedTo().getUserId().equals(user.getUserId());
-        boolean isAdmin = "ADMIN".equals(user.getRole()) || "LECTURER".equals(user.getRole());
+        boolean isAdminOrLecturer = user.getRole() == Role.ADMIN || user.getRole() == Role.LECTURER;
 
-        if (!isCreator && !isAssigned && !isAdmin) {
+        if (!isCreator && !isAssigned && !isAdminOrLecturer) {
             throw new UnauthorizedAccessException("You are not authorized to modify this task");
         }
     }
 
-    // Helper method to map Task to TaskResponse
+    // Helper method to map Task to TaskResponse - FIXED getName() issue
     private TaskResponse mapToResponse(Task task) {
         TaskResponse response = new TaskResponse();
         response.setTaskId(task.getTaskId());
@@ -303,16 +308,16 @@ public class TaskService {
             response.setTeamName(task.getTeam().getName());
         }
 
-        // Assigned user info
+        // Assigned user info - FIXED: Use getUsername() instead of getName()
         if (task.getAssignedTo() != null) {
             response.setAssignedTo(task.getAssignedTo().getUserId());
-            response.setAssignedToName(task.getAssignedTo().getName());
+            response.setAssignedToName(task.getAssignedTo().getUsername());  // ← FIXED
         }
 
-        // Creator info
+        // Creator info - FIXED: Use getUsername() instead of getName()
         if (task.getCreatedBy() != null) {
             response.setCreatedBy(task.getCreatedBy().getUserId());
-            response.setCreatedByName(task.getCreatedBy().getName());
+            response.setCreatedByName(task.getCreatedBy().getUsername());  // ← FIXED
         }
 
         // Milestone info

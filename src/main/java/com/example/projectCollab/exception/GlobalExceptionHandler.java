@@ -31,7 +31,6 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
-
     // ==========================================
     // BAD LOGIN
     // ==========================================
@@ -49,7 +48,6 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(response);
     }
-
 
     // ==========================================
     // VALIDATION
@@ -76,7 +74,6 @@ public class GlobalExceptionHandler {
                 .body(errors);
     }
 
-
     // ==========================================
     // ILLEGAL ARGUMENT
     // ==========================================
@@ -94,7 +91,6 @@ public class GlobalExceptionHandler {
                 .badRequest()
                 .body(response);
     }
-
 
     // ==========================================
     // UNAUTHORIZED ACCESS
@@ -114,7 +110,6 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
-
     // ==========================================
     // ILLEGAL STATE
     // ==========================================
@@ -130,6 +125,45 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .badRequest()
+                .body(response);
+    }
+
+    // ==========================================
+    // RESOURCE NOT FOUND
+    // ==========================================
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleResourceNotFound(
+            ResourceNotFoundException ex
+    ) {
+
+        Map<String, String> response = new HashMap<>();
+
+        response.put("error", ex.getMessage());
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(response);
+    }
+
+    // ==========================================
+    // GENERIC EXCEPTION (Optional - Catch all)
+    // ==========================================
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleGenericException(
+            Exception ex
+    ) {
+
+        Map<String, String> response = new HashMap<>();
+
+        response.put("error", "An unexpected error occurred: " + ex.getMessage());
+
+        // Log the error for debugging
+        ex.printStackTrace();
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(response);
     }
 }
