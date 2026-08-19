@@ -2,12 +2,14 @@ package com.example.projectCollab.controller;
 
 import com.example.projectCollab.dto.TaskRequest;
 import com.example.projectCollab.dto.TaskResponse;
+import com.example.projectCollab.dto.TaskSummaryResponse;
 import com.example.projectCollab.dto.TaskStatusUpdateRequest;
 import com.example.projectCollab.service.TaskService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize; // 1. Import ထည့်သွင်းပါ
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -23,6 +25,7 @@ public class TaskController {
      * POST /api/tasks
      */
     @PostMapping
+    @PreAuthorize("hasAnyRole('TEAM_LEADER', 'LECTURER', 'ADMIN')") // 2. Leader & Lecturer တည်း ဆောက်ခွင့်ပြုမည်
     public ResponseEntity<TaskResponse> createTask(@Valid @RequestBody TaskRequest request) {
         TaskResponse response = taskService.createTask(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -92,10 +95,20 @@ public class TaskController {
     }
 
     /**
+     * Get task summary for a project
+     * GET /api/tasks/project/{projectId}/summary
+     */
+    @GetMapping("/project/{projectId}/summary")
+    public ResponseEntity<TaskSummaryResponse> getTaskSummaryByProject(@PathVariable Long projectId) {
+        return ResponseEntity.ok(taskService.getTaskSummaryByProject(projectId));
+    }
+
+    /**
      * Update a task (full update)
      * PUT /api/tasks/{id}
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('TEAM_LEADER', 'LECTURER', 'ADMIN')") // 3. Leader & Lecturer သာ ပြင်ခွင့်ပြုမည်
     public ResponseEntity<TaskResponse> updateTask(
             @PathVariable Long id,
             @Valid @RequestBody TaskRequest request) {
@@ -107,6 +120,7 @@ public class TaskController {
      * PATCH /api/tasks/{id}/status
      */
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('STUDENT', 'TEAM_LEADER', 'LECTURER', 'ADMIN')") // 4. Student များပါ Status ပြောင်းခွင့်ပြုမည်
     public ResponseEntity<TaskResponse> updateTaskStatus(
             @PathVariable Long id,
             @Valid @RequestBody TaskStatusUpdateRequest request) {
@@ -118,6 +132,7 @@ public class TaskController {
      * DELETE /api/tasks/{id}
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('TEAM_LEADER', 'LECTURER', 'ADMIN')") // 5. Leader & Lecturer သာ ဖျက်ခွင့်ပြုမည်
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();

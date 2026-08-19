@@ -2,6 +2,7 @@ package com.example.projectCollab.service;
 
 import com.example.projectCollab.dto.TaskRequest;
 import com.example.projectCollab.dto.TaskResponse;
+import com.example.projectCollab.dto.TaskSummaryResponse;
 import com.example.projectCollab.entity.*;
 import com.example.projectCollab.exception.ResourceNotFoundException;
 import com.example.projectCollab.exception.UnauthorizedAccessException;
@@ -250,6 +251,39 @@ public class TaskService {
         }
 
         taskRepository.delete(task);
+    }
+
+    public TaskSummaryResponse getTaskSummaryByProject(Long projectId) {
+        if (!projectRepository.existsById(projectId)) {
+            throw new ResourceNotFoundException("Project", "id", projectId);
+        }
+
+        List<Task> tasks = taskRepository.findByProjectProjectId(projectId);
+        long total = tasks.size();
+
+        if (total == 0) {
+            return new TaskSummaryResponse(0, 0, 0, 0, 0.0);
+        }
+
+        long todo = tasks.stream()
+                .filter(t -> t.getStatus() == TaskStatus.TODO)
+                .count();
+        long inProgress = tasks.stream()
+                .filter(t -> t.getStatus() == TaskStatus.IN_PROGRESS)
+                .count();
+        long completed = tasks.stream()
+                .filter(t -> t.getStatus() == TaskStatus.COMPLETED)
+                .count();
+
+        double percentage = ((double) completed / total) * 100.0;
+
+        return new TaskSummaryResponse(
+                total,
+                todo,
+                inProgress,
+                completed,
+                Math.round(percentage * 100.0) / 100.0
+        );
     }
 
     // Helper method to get current user
