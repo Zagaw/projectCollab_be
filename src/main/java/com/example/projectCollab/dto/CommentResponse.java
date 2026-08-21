@@ -17,4 +17,6 @@ public class CommentResponse {
     private LocalDateTime updatedAt;
     private Long parentCommentId;
     private String parentCommentContent;
+    private int replyCount;          // NEW
+    private boolean isDeleted;       // NEW
 }

@@ -16,7 +16,8 @@ public class CommentController {
 
     private final CommentService commentService;
 
-    // Task Comments
+    // ============ TASK COMMENTS ============
+
     @PostMapping("/api/tasks/{taskId}/comments")
     public ResponseEntity<CommentResponse> addCommentToTask(
             @PathVariable Long taskId,
@@ -30,7 +31,8 @@ public class CommentController {
         return ResponseEntity.ok(commentService.getCommentsForTask(taskId));
     }
 
-    // Project Comments
+    // ============ PROJECT COMMENTS ============
+
     @PostMapping("/api/projects/{projectId}/comments")
     public ResponseEntity<CommentResponse> addCommentToProject(
             @PathVariable Long projectId,
@@ -44,9 +46,24 @@ public class CommentController {
         return ResponseEntity.ok(commentService.getCommentsForProject(projectId));
     }
 
+    // ============ COMMENT CRUD ============
+
+    @PutMapping("/api/comments/{commentId}")
+    public ResponseEntity<CommentResponse> updateComment(
+            @PathVariable Long commentId,
+            @Valid @RequestBody CommentRequest request) {
+        return ResponseEntity.ok(commentService.updateComment(commentId, request));
+    }
+
     @DeleteMapping("/api/comments/{commentId}")
     public ResponseEntity<Void> deleteComment(@PathVariable Long commentId) {
         commentService.deleteComment(commentId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/api/comments/{commentId}/hard")
+    public ResponseEntity<Void> hardDeleteComment(@PathVariable Long commentId) {
+        commentService.hardDeleteComment(commentId);
         return ResponseEntity.noContent().build();
     }
 }
