@@ -10,11 +10,15 @@ import java.util.List;
 @Repository
 public interface ActivityRepository extends JpaRepository<Activity, Long> {
 
-    List<Activity> findByProjectProjectIdOrderByCreatedAtDesc(Long projectId);
+    // ✅ Use @Query for all methods to avoid naming issues
+    @Query("SELECT a FROM Activity a WHERE a.project.projectId = :projectId ORDER BY a.createdAt DESC")
+    List<Activity> findActivitiesByProject(@Param("projectId") Long projectId);
 
-    List<Activity> findByUserIdOrderByCreatedAtDesc(Long userId);
+    @Query("SELECT a FROM Activity a WHERE a.user.userId = :userId ORDER BY a.createdAt DESC")
+    List<Activity> findActivitiesByUser(@Param("userId") Long userId);
 
-    List<Activity> findByProjectProjectIdAndUserIdOrderByCreatedAtDesc(Long projectId, Long userId);
+    @Query("SELECT a FROM Activity a WHERE a.project.projectId = :projectId AND a.user.userId = :userId ORDER BY a.createdAt DESC")
+    List<Activity> findActivitiesByProjectAndUser(@Param("projectId") Long projectId, @Param("userId") Long userId);
 
     @Query("SELECT a FROM Activity a WHERE a.project.projectId = :projectId ORDER BY a.createdAt DESC LIMIT :limit")
     List<Activity> findRecentActivitiesByProject(@Param("projectId") Long projectId, @Param("limit") int limit);

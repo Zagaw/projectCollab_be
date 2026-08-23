@@ -8,7 +8,6 @@ import com.example.projectCollab.repository.ActivityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,14 +32,14 @@ public class ActivityService {
     }
 
     public List<ActivityResponse> getActivitiesForProject(Long projectId) {
-        return activityRepository.findByProjectProjectIdOrderByCreatedAtDesc(projectId)
+        return activityRepository.findActivitiesByProject(projectId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
     public List<ActivityResponse> getActivitiesForUser(Long userId) {
-        return activityRepository.findByUserIdOrderByCreatedAtDesc(userId)
+        return activityRepository.findActivitiesByUser(userId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());

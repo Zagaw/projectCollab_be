@@ -11,12 +11,12 @@ import java.time.LocalDateTime;
 public class CommentResponse {
     private Long commentId;
     private String content;
-    private String userName;
     private Long userId;
+    private String userName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private boolean isDeleted;
+    private int replyCount;
     private Long parentCommentId;
     private String parentCommentContent;
-    private int replyCount;          // NEW
-    private boolean isDeleted;       // NEW
 }

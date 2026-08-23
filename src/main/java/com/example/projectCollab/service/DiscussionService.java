@@ -10,6 +10,7 @@ import com.example.projectCollab.repository.DiscussionRepository;
 import com.example.projectCollab.repository.DiscussionReplyRepository;
 import com.example.projectCollab.repository.ProjectRepository;
 import com.example.projectCollab.repository.UserRepository;
+import com.example.projectCollab.service.ActivityService;  // ✅ Add this import
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
