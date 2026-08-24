@@ -2,12 +2,16 @@ package com.example.projectCollab.controller;
 
 import com.example.projectCollab.dto.CommentRequest;
 import com.example.projectCollab.dto.CommentResponse;
+import com.example.projectCollab.dto.FileResponse;
 import com.example.projectCollab.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -18,10 +22,11 @@ public class CommentController {
 
     // ============ TASK COMMENTS ============
 
-    @PostMapping("/api/tasks/{taskId}/comments")
+    @PostMapping(value = "/api/tasks/{taskId}/comments", 
+                 consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CommentResponse> addCommentToTask(
             @PathVariable Long taskId,
-            @Valid @RequestBody CommentRequest request) {
+            @Valid @ModelAttribute CommentRequest request) throws IOException {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(commentService.addCommentToTask(taskId, request));
     }
@@ -33,10 +38,11 @@ public class CommentController {
 
     // ============ PROJECT COMMENTS ============
 
-    @PostMapping("/api/projects/{projectId}/comments")
+    @PostMapping(value = "/api/projects/{projectId}/comments",
+                 consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CommentResponse> addCommentToProject(
             @PathVariable Long projectId,
-            @Valid @RequestBody CommentRequest request) {
+            @Valid @ModelAttribute CommentRequest request) throws IOException {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(commentService.addCommentToProject(projectId, request));
     }
@@ -48,7 +54,22 @@ public class CommentController {
 
     // ============ COMMENT CRUD ============
 
-    @PutMapping("/api/comments/{commentId}")
+    @GetMapping("/api/comments/{commentId}")
+    public ResponseEntity<CommentResponse> getCommentById(@PathVariable Long commentId) {
+        return ResponseEntity.ok(commentService.getCommentById(commentId));
+    }
+
+    @GetMapping("/api/comments/{commentId}/replies")
+    public ResponseEntity<List<CommentResponse>> getRepliesForComment(@PathVariable Long commentId) {
+        return ResponseEntity.ok(commentService.getRepliesForComment(commentId));
+    }
+
+    @GetMapping("/api/comments/{commentId}/files")
+    public ResponseEntity<List<FileResponse>> getFilesForComment(@PathVariable Long commentId) {
+        return ResponseEntity.ok(commentService.getFilesForComment(commentId));
+    }
+
+    @PutMapping(value = "/api/comments/{commentId}")
     public ResponseEntity<CommentResponse> updateComment(
             @PathVariable Long commentId,
             @Valid @RequestBody CommentRequest request) {
@@ -62,8 +83,16 @@ public class CommentController {
     }
 
     @DeleteMapping("/api/comments/{commentId}/hard")
-    public ResponseEntity<Void> hardDeleteComment(@PathVariable Long commentId) {
+    public ResponseEntity<Void> hardDeleteComment(@PathVariable Long commentId) throws IOException {
         commentService.hardDeleteComment(commentId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ============ FILE OPERATIONS ============
+
+    @DeleteMapping("/api/comments/files/{fileId}")
+    public ResponseEntity<Void> deleteFileFromComment(@PathVariable Long fileId) throws IOException {
+        commentService.deleteFileFromComment(fileId);
         return ResponseEntity.noContent().build();
     }
 }

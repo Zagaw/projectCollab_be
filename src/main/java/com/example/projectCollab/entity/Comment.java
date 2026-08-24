@@ -22,7 +22,7 @@ public class Comment {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ✅ ADD THIS - Soft delete flag
+    // Soft delete flag
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 
@@ -43,9 +43,13 @@ public class Comment {
     @JoinColumn(name = "parent_comment_id")
     private Comment parentComment;
 
-    // ✅ ADD THIS - Replies to this comment
+    // Replies to this comment
     @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Comment> replies = new ArrayList<>();
+
+    // ✅ ADDED: One-to-many relationship with files
+    @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<File> files = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
@@ -60,41 +64,172 @@ public class Comment {
         updatedAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
-    public Long getCommentId() { return commentId; }
-    public void setCommentId(Long commentId) { this.commentId = commentId; }
+    // ==========================================
+    // GETTERS AND SETTERS
+    // ==========================================
 
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
+    public Long getCommentId() {
+        return commentId;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setCommentId(Long commentId) {
+        this.commentId = commentId;
+    }
 
-    // ✅ ADD GETTER/SETTER FOR isDeleted
-    public Boolean getIsDeleted() { return isDeleted; }
-    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+    public String getContent() {
+        return content;
+    }
 
-    // For convenience, add these methods
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
+
     public boolean isDeleted() {
         return isDeleted != null && isDeleted;
     }
+
     public void setDeleted(boolean deleted) {
         this.isDeleted = deleted;
     }
 
-    public Task getTask() { return task; }
-    public void setTask(Task task) { this.task = task; }
+    public Task getTask() {
+        return task;
+    }
 
-    public Project getProject() { return project; }
-    public void setProject(Project project) { this.project = project; }
+    public void setTask(Task task) {
+        this.task = task;
+    }
 
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
+    public Project getProject() {
+        return project;
+    }
 
-    public Comment getParentComment() { return parentComment; }
-    public void setParentComment(Comment parentComment) { this.parentComment = parentComment; }
+    public void setProject(Project project) {
+        this.project = project;
+    }
 
-    // ✅ ADD GETTER/SETTER FOR replies
-    public List<Comment> getReplies() { return replies; }
-    public void setReplies(List<Comment> replies) { this.replies = replies; }
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public Comment getParentComment() {
+        return parentComment;
+    }
+
+    public void setParentComment(Comment parentComment) {
+        this.parentComment = parentComment;
+    }
+
+    public List<Comment> getReplies() {
+        return replies;
+    }
+
+    public void setReplies(List<Comment> replies) {
+        this.replies = replies;
+    }
+
+    // ✅ ADDED: Getter and Setter for files
+    public List<File> getFiles() {
+        return files;
+    }
+
+    public void setFiles(List<File> files) {
+        this.files = files;
+    }
+
+    // ==========================================
+    // HELPER METHODS
+    // ==========================================
+
+    /**
+     * Add a file to this comment
+     */
+    public void addFile(File file) {
+        files.add(file);
+        file.setComment(this);
+    }
+
+    /**
+     * Remove a file from this comment
+     */
+    public void removeFile(File file) {
+        files.remove(file);
+        file.setComment(null);
+    }
+
+    /**
+     * Check if comment has any files
+     */
+    public boolean hasFiles() {
+        return files != null && !files.isEmpty();
+    }
+
+    /**
+     * Get total size of all files in this comment
+     */
+    public long getTotalFileSize() {
+        if (files == null || files.isEmpty()) {
+            return 0;
+        }
+        return files.stream()
+                .mapToLong(File::getFileSize)
+                .sum();
+    }
+
+    /**
+     * Add a reply to this comment
+     */
+    public void addReply(Comment reply) {
+        replies.add(reply);
+        reply.setParentComment(this);
+    }
+
+    /**
+     * Remove a reply from this comment
+     */
+    public void removeReply(Comment reply) {
+        replies.remove(reply);
+        reply.setParentComment(null);
+    }
+
+    /**
+     * Check if comment has any replies
+     */
+    public boolean hasReplies() {
+        return replies != null && !replies.isEmpty();
+    }
+
+    /**
+     * Get number of replies
+     */
+    public int getReplyCount() {
+        return replies != null ? replies.size() : 0;
+    }
+
+    /**
+     * Check if comment is a reply (has parent)
+     */
+    public boolean isReply() {
+        return parentComment != null;
+    }
 }

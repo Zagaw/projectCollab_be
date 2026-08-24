@@ -5,6 +5,9 @@ import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -16,4 +19,7 @@ public class CommentRequest {
     private String content;
 
     private Long parentCommentId; // For replies to comments
+
+    // This will be populated from multipart files
+    private List<MultipartFile> files;
 }

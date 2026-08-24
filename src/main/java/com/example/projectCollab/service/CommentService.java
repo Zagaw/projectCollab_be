@@ -2,10 +2,13 @@ package com.example.projectCollab.service;
 
 import com.example.projectCollab.dto.CommentRequest;
 import com.example.projectCollab.dto.CommentResponse;
+import com.example.projectCollab.dto.FileResponse;
 import com.example.projectCollab.entity.*;
+import com.example.projectCollab.exception.FileStorageException;
 import com.example.projectCollab.exception.ResourceNotFoundException;
 import com.example.projectCollab.exception.UnauthorizedAccessException;
 import com.example.projectCollab.repository.CommentRepository;
+import com.example.projectCollab.repository.FileRepository;
 import com.example.projectCollab.repository.TaskRepository;
 import com.example.projectCollab.repository.ProjectRepository;
 import com.example.projectCollab.repository.UserRepository;
@@ -14,6 +17,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +29,8 @@ import java.util.stream.Collectors;
 public class CommentService {
 
     private final CommentRepository commentRepository;
+    private final FileRepository fileRepository;
+    private final FileStorageService fileStorageService;
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
@@ -38,8 +47,11 @@ public class CommentService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
     }
 
+    // ==========================================
+    // ADD COMMENT TO TASK WITH FILES
+    // ==========================================
     @Transactional
-    public CommentResponse addCommentToTask(Long taskId, CommentRequest request) {
+    public CommentResponse addCommentToTask(Long taskId, CommentRequest request) throws IOException {
         User currentUser = getCurrentUser();
 
         Task task = taskRepository.findById(taskId)
@@ -50,7 +62,7 @@ public class CommentService {
         comment.setTask(task);
         comment.setUser(currentUser);
         comment.setProject(task.getProject());
-        comment.setDeleted(false);  // ✅ FIXED - Using setDeleted()
+        comment.setDeleted(false);
 
         if (request.getParentCommentId() != null) {
             Comment parentComment = commentRepository.findById(request.getParentCommentId())
@@ -58,11 +70,32 @@ public class CommentService {
             comment.setParentComment(parentComment);
         }
 
+        // Save comment first
         Comment savedComment = commentRepository.save(comment);
+
+        // Process file uploads
+        List<File> uploadedFiles = new ArrayList<>();
+        if (request.getFiles() != null && !request.getFiles().isEmpty()) {
+            for (MultipartFile file : request.getFiles()) {
+                if (!file.isEmpty()) {
+                    try {
+                        File fileEntity = fileStorageService.storeFile(file, savedComment.getCommentId(), currentUser);
+                        fileEntity.setComment(savedComment);
+                        File savedFile = fileRepository.save(fileEntity);
+                        uploadedFiles.add(savedFile);
+                    } catch (IOException e) {
+                        throw new FileStorageException("Failed to store file: " + file.getOriginalFilename(), e);
+                    }
+                }
+            }
+        }
+
+        savedComment.setFiles(uploadedFiles);
 
         // Log activity
         String description = currentUser.getFirstName() + " " + currentUser.getLastName() +
-                " commented on task: " + task.getTitle();
+                " commented on task: " + task.getTitle() + 
+                (uploadedFiles.isEmpty() ? "" : " with " + uploadedFiles.size() + " file(s)");
         activityService.logActivity(
                 currentUser,
                 task.getProject(),
@@ -75,8 +108,11 @@ public class CommentService {
         return mapToResponse(savedComment);
     }
 
+    // ==========================================
+    // ADD COMMENT TO PROJECT WITH FILES
+    // ==========================================
     @Transactional
-    public CommentResponse addCommentToProject(Long projectId, CommentRequest request) {
+    public CommentResponse addCommentToProject(Long projectId, CommentRequest request) throws IOException {
         User currentUser = getCurrentUser();
 
         Project project = projectRepository.findById(projectId)
@@ -86,12 +122,40 @@ public class CommentService {
         comment.setContent(request.getContent());
         comment.setProject(project);
         comment.setUser(currentUser);
-        comment.setDeleted(false);  // ✅ FIXED - Using setDeleted()
+        comment.setDeleted(false);
 
+        if (request.getParentCommentId() != null) {
+            Comment parentComment = commentRepository.findById(request.getParentCommentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
+            comment.setParentComment(parentComment);
+        }
+
+        // Save comment first
         Comment savedComment = commentRepository.save(comment);
 
+        // Process file uploads
+        List<File> uploadedFiles = new ArrayList<>();
+        if (request.getFiles() != null && !request.getFiles().isEmpty()) {
+            for (MultipartFile file : request.getFiles()) {
+                if (!file.isEmpty()) {
+                    try {
+                        File fileEntity = fileStorageService.storeFile(file, savedComment.getCommentId(), currentUser);
+                        fileEntity.setComment(savedComment);
+                        File savedFile = fileRepository.save(fileEntity);
+                        uploadedFiles.add(savedFile);
+                    } catch (IOException e) {
+                        throw new FileStorageException("Failed to store file: " + file.getOriginalFilename(), e);
+                    }
+                }
+            }
+        }
+
+        savedComment.setFiles(uploadedFiles);
+
+        // Log activity
         String description = currentUser.getFirstName() + " " + currentUser.getLastName() +
-                " commented on project: " + project.getTitle();
+                " commented on project: " + project.getTitle() +
+                (uploadedFiles.isEmpty() ? "" : " with " + uploadedFiles.size() + " file(s)");
         activityService.logActivity(
                 currentUser,
                 project,
@@ -104,13 +168,19 @@ public class CommentService {
         return mapToResponse(savedComment);
     }
 
+    // ==========================================
+    // GET COMMENTS FOR TASK WITH FILES
+    // ==========================================
     public List<CommentResponse> getCommentsForTask(Long taskId) {
-        List<Comment> comments = commentRepository.findActiveCommentsByTask(taskId);
+        List<Comment> comments = commentRepository.findActiveRootCommentsByTask(taskId);
         return comments.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+    // ==========================================
+    // GET COMMENTS FOR PROJECT WITH FILES
+    // ==========================================
     public List<CommentResponse> getCommentsForProject(Long projectId) {
         List<Comment> comments = commentRepository.findActiveCommentsByProject(projectId);
         return comments.stream()
@@ -118,6 +188,33 @@ public class CommentService {
                 .collect(Collectors.toList());
     }
 
+    // ==========================================
+    // GET REPLIES FOR COMMENT
+    // ==========================================
+    public List<CommentResponse> getRepliesForComment(Long commentId) {
+        List<Comment> replies = commentRepository.findActiveRepliesByParentCommentId(commentId);
+        return replies.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // ==========================================
+    // GET COMMENT BY ID
+    // ==========================================
+    public CommentResponse getCommentById(Long commentId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        if (comment.isDeleted()) {
+            throw new ResourceNotFoundException("Comment has been deleted");
+        }
+
+        return mapToResponse(comment);
+    }
+
+    // ==========================================
+    // UPDATE COMMENT
+    // ==========================================
     @Transactional
     public CommentResponse updateComment(Long commentId, CommentRequest request) {
         User currentUser = getCurrentUser();
@@ -128,7 +225,6 @@ public class CommentService {
             throw new UnauthorizedAccessException("You are not authorized to edit this comment");
         }
 
-        // ✅ FIXED - Using isDeleted()
         if (comment.isDeleted()) {
             throw new RuntimeException("Cannot edit a deleted comment");
         }
@@ -139,6 +235,9 @@ public class CommentService {
         return mapToResponse(updatedComment);
     }
 
+    // ==========================================
+    // SOFT DELETE COMMENT (with files)
+    // ==========================================
     @Transactional
     public void deleteComment(Long commentId) {
         User currentUser = getCurrentUser();
@@ -154,13 +253,16 @@ public class CommentService {
             throw new UnauthorizedAccessException("You are not authorized to delete this comment");
         }
 
-        // ✅ FIXED - Using setDeleted()
+        // Soft delete - just mark as deleted (files remain)
         comment.setDeleted(true);
         commentRepository.save(comment);
     }
 
+    // ==========================================
+    // HARD DELETE COMMENT (with files)
+    // ==========================================
     @Transactional
-    public void hardDeleteComment(Long commentId) {
+    public void hardDeleteComment(Long commentId) throws IOException {
         User currentUser = getCurrentUser();
 
         if (!"ADMIN".equals(currentUser.getRole().name())) {
@@ -170,8 +272,72 @@ public class CommentService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
+        // Delete physical files
+        if (comment.getFiles() != null && !comment.getFiles().isEmpty()) {
+            for (File file : comment.getFiles()) {
+                try {
+                    fileStorageService.deleteFile(file.getFileId());
+                } catch (IOException e) {
+                    // Log error but continue deleting other files
+                    System.err.println("Failed to delete file: " + file.getFileId() + " - " + e.getMessage());
+                }
+            }
+        }
+
+        // Delete comment (cascade will delete file references from DB)
         commentRepository.delete(comment);
     }
+
+    // ==========================================
+    // DELETE FILE FROM COMMENT
+    // ==========================================
+    @Transactional
+    public void deleteFileFromComment(Long fileId) throws IOException {
+        User currentUser = getCurrentUser();
+        
+        File file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new ResourceNotFoundException("File not found"));
+
+        Comment comment = file.getComment();
+
+        // Check if user owns the file or the comment
+        boolean isFileOwner = file.getUploadedBy().getUserId().equals(currentUser.getUserId());
+        boolean isCommentOwner = comment.getUser().getUserId().equals(currentUser.getUserId());
+        boolean isAdmin = "ADMIN".equals(currentUser.getRole().name());
+        boolean isLecturer = "LECTURER".equals(currentUser.getRole().name());
+
+        if (!isFileOwner && !isCommentOwner && !isAdmin && !isLecturer) {
+            throw new UnauthorizedAccessException("You don't have permission to delete this file");
+        }
+
+        // Check if comment is deleted
+        if (comment.isDeleted()) {
+            throw new RuntimeException("Cannot delete file from a deleted comment");
+        }
+
+        fileStorageService.deleteFile(fileId);
+    }
+
+    // ==========================================
+    // GET FILES FOR COMMENT
+    // ==========================================
+    public List<FileResponse> getFilesForComment(Long commentId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        if (comment.isDeleted()) {
+            throw new ResourceNotFoundException("Comment has been deleted");
+        }
+
+        List<File> files = fileRepository.findFilesByCommentIdOrderByUploadedAtAsc(commentId);
+        return files.stream()
+                .map(this::mapToFileResponse)
+                .collect(Collectors.toList());
+    }
+
+    // ==========================================
+    // CONVERTERS
+    // ==========================================
 
     private CommentResponse mapToResponse(Comment comment) {
         CommentResponse response = new CommentResponse();
@@ -181,9 +347,9 @@ public class CommentService {
         response.setUserName(comment.getUser().getFirstName() + " " + comment.getUser().getLastName());
         response.setCreatedAt(comment.getCreatedAt());
         response.setUpdatedAt(comment.getUpdatedAt());
-        response.setDeleted(comment.isDeleted());  // ✅ FIXED - Using isDeleted()
+        response.setDeleted(comment.isDeleted());
 
-        // ✅ FIXED - Using getReplies()
+        // Count active replies
         if (comment.getReplies() != null && !comment.getReplies().isEmpty()) {
             long replyCount = comment.getReplies().stream()
                     .filter(reply -> !reply.isDeleted())
@@ -198,6 +364,26 @@ public class CommentService {
             response.setParentCommentContent(comment.getParentComment().getContent());
         }
 
+        // Get files for this comment
+        List<File> files = fileRepository.findFilesByCommentIdOrderByUploadedAtAsc(comment.getCommentId());
+        response.setFiles(files.stream()
+                .map(this::mapToFileResponse)
+                .collect(Collectors.toList()));
+
+        return response;
+    }
+
+    private FileResponse mapToFileResponse(File file) {
+        FileResponse response = new FileResponse();
+        response.setFileId(file.getFileId());
+        response.setFileName(file.getFileName());
+        response.setFileSize(file.getFileSize());
+        response.setFileType(file.getFileType());
+        response.setFileUrl("/api/files/download/" + file.getFileId());
+        response.setUploadedAt(file.getUploadedAt());
+        response.setUploadedBy(file.getUploadedBy().getUserId());
+        response.setUploadedByName(file.getUploadedBy().getFirstName() + " " + file.getUploadedBy().getLastName());
+        response.setStorageType(file.getStorageType().name());
         return response;
     }
 }
