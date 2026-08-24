@@ -26,17 +26,15 @@ public class TaskService {
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final MilestoneRepository milestoneRepository;
+    private final TeamMemberRepository teamMemberRepository;  // Add this
 
     @Transactional
     public TaskResponse createTask(TaskRequest request) {
-        // Get current user
         User currentUser = getCurrentUser();
 
-        // Validate project exists
         Project project = projectRepository.findById(request.getProjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project", "id", request.getProjectId()));
 
-        // Build task
         Task task = new Task();
         task.setTitle(request.getTitle());
         task.setDescription(request.getDescription());
@@ -44,7 +42,6 @@ public class TaskService {
         task.setProject(project);
         task.setCreatedBy(currentUser);
 
-        // Set status and priority
         if (request.getStatus() != null) {
             try {
                 task.setStatus(TaskStatus.valueOf(request.getStatus().toUpperCase()));
@@ -62,21 +59,18 @@ public class TaskService {
             }
         }
 
-        // Set team if provided
         if (request.getTeamId() != null) {
             Team team = teamRepository.findById(request.getTeamId())
                     .orElseThrow(() -> new ResourceNotFoundException("Team", "id", request.getTeamId()));
             task.setTeam(team);
         }
 
-        // Assign to user if provided
         if (request.getAssignedTo() != null) {
             User assignedUser = userRepository.findById(request.getAssignedTo())
                     .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getAssignedTo()));
             task.setAssignedTo(assignedUser);
         }
 
-        // Link to milestone if provided
         if (request.getMilestoneId() != null) {
             Milestone milestone = milestoneRepository.findById(request.getMilestoneId())
                     .orElseThrow(() -> new ResourceNotFoundException("Milestone", "id", request.getMilestoneId()));
@@ -90,25 +84,40 @@ public class TaskService {
     public TaskResponse getTaskById(Long taskId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
+
+        // ✅ FIX: Check if user has access to this task
+        User currentUser = getCurrentUser();
+        if (!hasAccessToTask(task, currentUser)) {
+            throw new UnauthorizedAccessException("You don't have permission to view this task");
+        }
+
         return mapToResponse(task);
     }
 
+    // ✅ FIX: Add authorization check
     public List<TaskResponse> getTasksByProject(Long projectId) {
-        // Verify project exists
-        if (!projectRepository.existsById(projectId)) {
-            throw new ResourceNotFoundException("Project", "id", projectId);
+        User currentUser = getCurrentUser();
+
+        // Check if user has access to this project
+        if (!hasAccessToProject(projectId, currentUser)) {
+            throw new UnauthorizedAccessException("You don't have permission to view tasks for this project");
         }
+
         return taskRepository.findByProjectProjectId(projectId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+    // ✅ FIX: Add authorization check
     public List<TaskResponse> getTasksByTeam(Long teamId) {
-        // Verify team exists
-        if (!teamRepository.existsById(teamId)) {
-            throw new ResourceNotFoundException("Team", "id", teamId);
+        User currentUser = getCurrentUser();
+
+        // Check if user has access to this team
+        if (!hasAccessToTeam(teamId, currentUser)) {
+            throw new UnauthorizedAccessException("You don't have permission to view tasks for this team");
         }
+
         return taskRepository.findByTeamTeamId(teamId)
                 .stream()
                 .map(this::mapToResponse)
@@ -116,6 +125,15 @@ public class TaskService {
     }
 
     public List<TaskResponse> getTasksAssignedToStudent(Long studentId) {
+        // ✅ FIX: Only lecturers and admins can view other students' tasks
+        User currentUser = getCurrentUser();
+        boolean isAdminOrLecturer = currentUser.getRole() == Role.ADMIN || currentUser.getRole() == Role.LECTURER;
+        boolean isSelf = currentUser.getUserId().equals(studentId);
+
+        if (!isAdminOrLecturer && !isSelf) {
+            throw new UnauthorizedAccessException("You don't have permission to view other students' tasks");
+        }
+
         if (!userRepository.existsById(studentId)) {
             throw new ResourceNotFoundException("User", "id", studentId);
         }
@@ -125,10 +143,18 @@ public class TaskService {
                 .collect(Collectors.toList());
     }
 
+    // ✅ FIX: Add authorization check
     public List<TaskResponse> getTasksByMilestone(Long milestoneId) {
-        if (!milestoneRepository.existsById(milestoneId)) {
-            throw new ResourceNotFoundException("Milestone", "id", milestoneId);
+        User currentUser = getCurrentUser();
+
+        Milestone milestone = milestoneRepository.findById(milestoneId)
+                .orElseThrow(() -> new ResourceNotFoundException("Milestone", "id", milestoneId));
+
+        // Check if user has access to the milestone's team
+        if (!hasAccessToTeam(milestone.getTeam().getTeamId(), currentUser)) {
+            throw new UnauthorizedAccessException("You don't have permission to view tasks for this milestone");
         }
+
         return taskRepository.findByMilestoneMilestoneId(milestoneId)
                 .stream()
                 .map(this::mapToResponse)
@@ -151,14 +177,54 @@ public class TaskService {
                 .collect(Collectors.toList());
     }
 
+    // ✅ FIX: Add authorization check
+    public TaskSummaryResponse getTaskSummaryByProject(Long projectId) {
+        User currentUser = getCurrentUser();
+
+        // Check if user has access to this project
+        if (!hasAccessToProject(projectId, currentUser)) {
+            throw new UnauthorizedAccessException("You don't have permission to view task summary for this project");
+        }
+
+        if (!projectRepository.existsById(projectId)) {
+            throw new ResourceNotFoundException("Project", "id", projectId);
+        }
+
+        List<Task> tasks = taskRepository.findByProjectProjectId(projectId);
+        long total = tasks.size();
+
+        if (total == 0) {
+            return new TaskSummaryResponse(0, 0, 0, 0, 0.0);
+        }
+
+        long todo = tasks.stream()
+                .filter(t -> t.getStatus() == TaskStatus.TODO)
+                .count();
+        long inProgress = tasks.stream()
+                .filter(t -> t.getStatus() == TaskStatus.IN_PROGRESS)
+                .count();
+        long completed = tasks.stream()
+                .filter(t -> t.getStatus() == TaskStatus.COMPLETED)
+                .count();
+
+        double percentage = ((double) completed / total) * 100.0;
+
+        return new TaskSummaryResponse(
+                total,
+                todo,
+                inProgress,
+                completed,
+                Math.round(percentage * 100.0) / 100.0
+        );
+    }
+
     @Transactional
     public TaskResponse updateTask(Long taskId, TaskRequest request) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
-        // Check authorization
         User currentUser = getCurrentUser();
-        validateTaskAccess(task, currentUser);
+        validateTaskModificationAccess(task, currentUser);
 
         if (request.getTitle() != null) {
             task.setTitle(request.getTitle());
@@ -215,7 +281,7 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
         User currentUser = getCurrentUser();
-        validateTaskAccess(task, currentUser);
+        validateTaskStatusAccess(task, currentUser);
 
         try {
             TaskStatus newStatus = TaskStatus.valueOf(status.toUpperCase());
@@ -242,7 +308,6 @@ public class TaskService {
 
         User currentUser = getCurrentUser();
 
-        // Check if user is creator OR has admin/lecturer role
         boolean isCreator = task.getCreatedBy().getUserId().equals(currentUser.getUserId());
         boolean isAdminOrLecturer = currentUser.getRole() == Role.ADMIN || currentUser.getRole() == Role.LECTURER;
 
@@ -253,40 +318,153 @@ public class TaskService {
         taskRepository.delete(task);
     }
 
-    public TaskSummaryResponse getTaskSummaryByProject(Long projectId) {
-        if (!projectRepository.existsById(projectId)) {
-            throw new ResourceNotFoundException("Project", "id", projectId);
+    // ==========================================
+    // ✅ NEW: AUTHORIZATION HELPER METHODS
+    // ==========================================
+
+    /**
+     * Check if user has access to view a task
+     * - User is the assigned person
+     * - User is the creator
+     * - User is a team member of the task's team
+     * - User is the lecturer of the project
+     * - User is admin
+     */
+    private boolean hasAccessToTask(Task task, User user) {
+        // Admin has full access
+        if (user.getRole() == Role.ADMIN) {
+            return true;
         }
 
-        List<Task> tasks = taskRepository.findByProjectProjectId(projectId);
-        long total = tasks.size();
-
-        if (total == 0) {
-            return new TaskSummaryResponse(0, 0, 0, 0, 0.0);
+        // User is assigned to the task
+        if (task.getAssignedTo() != null &&
+                task.getAssignedTo().getUserId().equals(user.getUserId())) {
+            return true;
         }
 
-        long todo = tasks.stream()
-                .filter(t -> t.getStatus() == TaskStatus.TODO)
-                .count();
-        long inProgress = tasks.stream()
-                .filter(t -> t.getStatus() == TaskStatus.IN_PROGRESS)
-                .count();
-        long completed = tasks.stream()
-                .filter(t -> t.getStatus() == TaskStatus.COMPLETED)
-                .count();
+        // User created the task
+        if (task.getCreatedBy().getUserId().equals(user.getUserId())) {
+            return true;
+        }
 
-        double percentage = ((double) completed / total) * 100.0;
+        // Check if user is a team member
+        if (task.getTeam() != null) {
+            return isTeamMember(task.getTeam().getTeamId(), user.getUserId());
+        }
 
-        return new TaskSummaryResponse(
-                total,
-                todo,
-                inProgress,
-                completed,
-                Math.round(percentage * 100.0) / 100.0
-        );
+        // Check if user is the lecturer of the project
+        if (task.getProject() != null && task.getProject().getLecturer() != null) {
+            return task.getProject().getLecturer().getUserId().equals(user.getUserId());
+        }
+
+        return false;
     }
 
-    // Helper method to get current user
+    /**
+     * Check if user has access to a project
+     * - User is the lecturer of the project
+     * - User is a member of any team in the project
+     * - User is admin
+     */
+    private boolean hasAccessToProject(Long projectId, User user) {
+        // Admin has full access
+        if (user.getRole() == Role.ADMIN) {
+            return true;
+        }
+
+        // Get the project
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project == null) {
+            return false;
+        }
+
+        // Check if user is the lecturer
+        if (project.getLecturer() != null &&
+                project.getLecturer().getUserId().equals(user.getUserId())) {
+            return true;
+        }
+
+        // Check if user is a member of any team in this project
+        List<Team> teams = teamRepository.findByProject_ProjectId(projectId);
+        for (Team team : teams) {
+            if (isTeamMember(team.getTeamId(), user.getUserId())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if user has access to a team
+     * - User is a member of the team
+     * - User is the lecturer of the project
+     * - User is admin
+     */
+    private boolean hasAccessToTeam(Long teamId, User user) {
+        // Admin has full access
+        if (user.getRole() == Role.ADMIN) {
+            return true;
+        }
+
+        // Check if user is a team member
+        if (isTeamMember(teamId, user.getUserId())) {
+            return true;
+        }
+
+        // Check if user is the lecturer of the project
+        Team team = teamRepository.findById(teamId).orElse(null);
+        if (team != null && team.getProject() != null && team.getProject().getLecturer() != null) {
+            return team.getProject().getLecturer().getUserId().equals(user.getUserId());
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a user is a member of a team
+     */
+    private boolean isTeamMember(Long teamId, Long userId) {
+        return teamMemberRepository.findByTeam_TeamIdAndUser_UserId(teamId, userId).isPresent();
+    }
+
+    /**
+     * Validate access for task modification (update full task)
+     * - User is the creator OR
+     * - User is the lecturer OR
+     * - User is admin
+     */
+    private void validateTaskModificationAccess(Task task, User user) {
+        boolean isCreator = task.getCreatedBy().getUserId().equals(user.getUserId());
+        boolean isAdminOrLecturer = user.getRole() == Role.ADMIN || user.getRole() == Role.LECTURER;
+
+        if (!isCreator && !isAdminOrLecturer) {
+            throw new UnauthorizedAccessException("You are not authorized to modify this task");
+        }
+    }
+
+    /**
+     * Validate access for task status update
+     * - User is the assigned person OR
+     * - User is the creator OR
+     * - User is the lecturer OR
+     * - User is admin
+     */
+    private void validateTaskStatusAccess(Task task, User user) {
+        boolean isAssigned = task.getAssignedTo() != null &&
+                task.getAssignedTo().getUserId().equals(user.getUserId());
+        boolean isCreator = task.getCreatedBy().getUserId().equals(user.getUserId());
+        boolean isAdminOrLecturer = user.getRole() == Role.ADMIN || user.getRole() == Role.LECTURER;
+
+        if (!isAssigned && !isCreator && !isAdminOrLecturer) {
+            throw new UnauthorizedAccessException("You are not authorized to update the status of this task");
+        }
+    }
+
+    // ==========================================
+    // HELPER METHODS (Existing)
+    // ==========================================
+
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -298,19 +476,6 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
     }
 
-    // Helper method to validate task access
-    private void validateTaskAccess(Task task, User user) {
-        boolean isCreator = task.getCreatedBy().getUserId().equals(user.getUserId());
-        boolean isAssigned = task.getAssignedTo() != null &&
-                task.getAssignedTo().getUserId().equals(user.getUserId());
-        boolean isAdminOrLecturer = user.getRole() == Role.ADMIN || user.getRole() == Role.LECTURER;
-
-        if (!isCreator && !isAssigned && !isAdminOrLecturer) {
-            throw new UnauthorizedAccessException("You are not authorized to modify this task");
-        }
-    }
-
-    // Helper method to map Task to TaskResponse - FIXED getName() issue
     private TaskResponse mapToResponse(Task task) {
         TaskResponse response = new TaskResponse();
         response.setTaskId(task.getTaskId());
@@ -323,38 +488,32 @@ public class TaskService {
         response.setCreatedAt(task.getCreatedAt());
         response.setUpdatedAt(task.getUpdatedAt());
 
-        // Check if overdue
         if (task.getDeadline() != null &&
                 task.getDeadline().isBefore(LocalDateTime.now()) &&
                 task.getStatus() != TaskStatus.COMPLETED) {
             response.setOverdue(true);
         }
 
-        // Project info
         if (task.getProject() != null) {
             response.setProjectId(task.getProject().getProjectId());
             response.setProjectTitle(task.getProject().getTitle());
         }
 
-        // Team info
         if (task.getTeam() != null) {
             response.setTeamId(task.getTeam().getTeamId());
             response.setTeamName(task.getTeam().getName());
         }
 
-        // Assigned user info - FIXED: Use getUsername() instead of getName()
         if (task.getAssignedTo() != null) {
             response.setAssignedTo(task.getAssignedTo().getUserId());
-            response.setAssignedToName(task.getAssignedTo().getUsername());  // ← FIXED
+            response.setAssignedToName(task.getAssignedTo().getUsername());
         }
 
-        // Creator info - FIXED: Use getUsername() instead of getName()
         if (task.getCreatedBy() != null) {
             response.setCreatedBy(task.getCreatedBy().getUserId());
-            response.setCreatedByName(task.getCreatedBy().getUsername());  // ← FIXED
+            response.setCreatedByName(task.getCreatedBy().getUsername());
         }
 
-        // Milestone info
         if (task.getMilestone() != null) {
             response.setMilestoneId(task.getMilestone().getMilestoneId());
             response.setMilestoneTitle(task.getMilestone().getTitle());
