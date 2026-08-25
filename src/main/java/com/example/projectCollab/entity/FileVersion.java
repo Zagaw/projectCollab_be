@@ -34,6 +34,9 @@ public class FileVersion {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "change_comment", length = 500)
+    private String changeComment;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "file_id", nullable = false)
     private File file;

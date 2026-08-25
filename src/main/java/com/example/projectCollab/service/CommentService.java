@@ -35,6 +35,7 @@ public class CommentService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
+    private final FileVersionService fileVersionService;
 
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -48,8 +49,8 @@ public class CommentService {
     }
 
     // ==========================================
-    // ADD COMMENT TO TASK WITH FILES
-    // ==========================================
+// ADD COMMENT TO TASK WITH FILES - FIXED
+// ==========================================
     @Transactional
     public CommentResponse addCommentToTask(Long taskId, CommentRequest request) throws IOException {
         User currentUser = getCurrentUser();
@@ -70,18 +71,27 @@ public class CommentService {
             comment.setParentComment(parentComment);
         }
 
-        // Save comment first
+        // ✅ STEP 1: Save comment first
         Comment savedComment = commentRepository.save(comment);
 
-        // Process file uploads
+        // ✅ STEP 2: Process file uploads AFTER comment is saved
         List<File> uploadedFiles = new ArrayList<>();
         if (request.getFiles() != null && !request.getFiles().isEmpty()) {
             for (MultipartFile file : request.getFiles()) {
                 if (!file.isEmpty()) {
                     try {
-                        File fileEntity = fileStorageService.storeFile(file, savedComment.getCommentId(), currentUser);
+                        // Prepare file entity (does not save to DB)
+                        File fileEntity = fileStorageService.prepareFileEntity(file, currentUser);
+
+                        // ✅ Set the comment on the file entity
                         fileEntity.setComment(savedComment);
+
+                        // ✅ Save file to database
                         File savedFile = fileRepository.save(fileEntity);
+
+                        // ✅ Create initial version
+                        fileVersionService.createInitialVersion(savedFile, file, currentUser);
+
                         uploadedFiles.add(savedFile);
                     } catch (IOException e) {
                         throw new FileStorageException("Failed to store file: " + file.getOriginalFilename(), e);
@@ -94,7 +104,7 @@ public class CommentService {
 
         // Log activity
         String description = currentUser.getFirstName() + " " + currentUser.getLastName() +
-                " commented on task: " + task.getTitle() + 
+                " commented on task: " + task.getTitle() +
                 (uploadedFiles.isEmpty() ? "" : " with " + uploadedFiles.size() + " file(s)");
         activityService.logActivity(
                 currentUser,
@@ -109,8 +119,8 @@ public class CommentService {
     }
 
     // ==========================================
-    // ADD COMMENT TO PROJECT WITH FILES
-    // ==========================================
+// ADD COMMENT TO PROJECT WITH FILES - FIXED
+// ==========================================
     @Transactional
     public CommentResponse addCommentToProject(Long projectId, CommentRequest request) throws IOException {
         User currentUser = getCurrentUser();
@@ -130,18 +140,27 @@ public class CommentService {
             comment.setParentComment(parentComment);
         }
 
-        // Save comment first
+        // ✅ STEP 1: Save comment first
         Comment savedComment = commentRepository.save(comment);
 
-        // Process file uploads
+        // ✅ STEP 2: Process file uploads AFTER comment is saved
         List<File> uploadedFiles = new ArrayList<>();
         if (request.getFiles() != null && !request.getFiles().isEmpty()) {
             for (MultipartFile file : request.getFiles()) {
                 if (!file.isEmpty()) {
                     try {
-                        File fileEntity = fileStorageService.storeFile(file, savedComment.getCommentId(), currentUser);
+                        // Prepare file entity (does not save to DB)
+                        File fileEntity = fileStorageService.prepareFileEntity(file, currentUser);
+
+                        // ✅ Set the comment on the file entity
                         fileEntity.setComment(savedComment);
+
+                        // ✅ Save file to database
                         File savedFile = fileRepository.save(fileEntity);
+
+                        // ✅ Create initial version
+                        fileVersionService.createInitialVersion(savedFile, file, currentUser);
+
                         uploadedFiles.add(savedFile);
                     } catch (IOException e) {
                         throw new FileStorageException("Failed to store file: " + file.getOriginalFilename(), e);

@@ -14,4 +14,9 @@ public class FileUploadResponse {
     private String fileType;
     private String downloadUrl;
     private String message;
+
+    // ✅ ADDED: Version info
+    private Integer versionNumber;
+    private Integer totalVersions;
+    private Boolean hasNewerVersion;
 }
