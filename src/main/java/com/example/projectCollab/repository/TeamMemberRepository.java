@@ -20,7 +20,7 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     // Get all team memberships for a user
     List<TeamMember> findByUser_UserId(Long userId);
 
-    // Get pending invitations for a user - FIXED with JOIN FETCH
+    // Get pending invitations for a user - with JOIN FETCH
     @Query("SELECT tm FROM TeamMember tm " +
             "JOIN FETCH tm.team t " +
             "JOIN FETCH t.project p " +
@@ -32,15 +32,12 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     // FIND BY TEAM
     // ==========================================
 
-    // Get all members of a team - FIXED: Removed duplicate, only keep the @Query version
+    // Get all members of a team
     @Query("SELECT tm FROM TeamMember tm " +
             "JOIN FETCH tm.team t " +
             "JOIN FETCH tm.user u " +
             "WHERE t.teamId = :teamId")
     List<TeamMember> findMembersByTeamId(@Param("teamId") Long teamId);
-
-    // Alternative: Use this if you prefer the default JPA method
-    // List<TeamMember> findByTeam_TeamId(Long teamId);
 
     // Get active members of a team
     @Query("SELECT tm FROM TeamMember tm " +
@@ -68,8 +65,15 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     boolean existsByTeam_TeamIdAndUser_UserId(Long teamId, Long userId);
 
     // ==========================================
-    // ADD THESE METHODS FOR MILESTONE ACCESS
+    // ✅ UPDATED: Active Team Memberships with JOIN FETCH
     // ==========================================
+
+    // ✅ FIXED: Get active team memberships for a user (JOIN FETCH for efficiency)
+    @Query("SELECT tm FROM TeamMember tm " +
+            "JOIN FETCH tm.team t " +
+            "JOIN FETCH t.project p " +
+            "WHERE tm.user.userId = :userId AND tm.status = 'ACTIVE'")
+    List<TeamMember> findActiveTeamsByUserId(@Param("userId") Long userId);
 
     // Check if a user has an ACTIVE membership in a team
     @Query("SELECT CASE WHEN COUNT(tm) > 0 THEN true ELSE false END " +
@@ -77,17 +81,10 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
             "WHERE tm.team.teamId = :teamId " +
             "AND tm.user.userId = :userId " +
             "AND tm.status = 'ACTIVE'")
-    boolean isActiveMember(@Param("teamId") Long teamId, 
-                          @Param("userId") Long userId);
+    boolean isActiveMember(@Param("teamId") Long teamId,
+                           @Param("userId") Long userId);
 
-    // Get active team memberships for a user (JOIN FETCH for efficiency)
-    @Query("SELECT tm FROM TeamMember tm " +
-            "JOIN FETCH tm.team t " +
-            "JOIN FETCH t.project p " +
-            "WHERE tm.user.userId = :userId AND tm.status = 'ACTIVE'")
-    List<TeamMember> findActiveTeamsByUserId(@Param("userId") Long userId);
-
-    // Get all teams where user is a member (any status)
+    // Get all active team IDs for a user
     @Query("SELECT tm.team.teamId FROM TeamMember tm " +
             "WHERE tm.user.userId = :userId AND tm.status = 'ACTIVE'")
     List<Long> findActiveTeamIdsByUserId(@Param("userId") Long userId);
