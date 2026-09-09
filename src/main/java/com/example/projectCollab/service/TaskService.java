@@ -28,6 +28,7 @@ public class TaskService {
     private final MilestoneRepository milestoneRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final ActivityService activityService;
+    private final NotificationService notificationService;
 
     @Transactional
     public TaskResponse createTask(TaskRequest request) {
@@ -87,6 +88,7 @@ public class TaskService {
                 "TASK",
                 savedTask.getTaskId()
         );
+        notificationService.notifyTaskAssigned(currentUser, savedTask);
         return mapToResponse(savedTask);
     }
 
@@ -178,6 +180,21 @@ public class TaskService {
                 .collect(Collectors.toList());
     }
 
+    public List<TaskResponse> getTasksForLecturer() {
+        User currentUser = getCurrentUser();
+        if (currentUser.getRole() != Role.LECTURER && currentUser.getRole() != Role.ADMIN) {
+            throw new UnauthorizedAccessException("Only lecturers can view project task overview");
+        }
+        return taskRepository.findByLecturerIdWithDetails(currentUser.getUserId()).stream()
+                .sorted((a, b) -> {
+                    if (a.getDeadline() == null) return 1;
+                    if (b.getDeadline() == null) return -1;
+                    return a.getDeadline().compareTo(b.getDeadline());
+                })
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     public List<TaskResponse> getMyOverdueTasks() {
         User currentUser = getCurrentUser();
         return taskRepository.findOverdueTasksForUser(currentUser.getUserId(), LocalDateTime.now())
@@ -234,6 +251,7 @@ public class TaskService {
 
         User currentUser = getCurrentUser();
         validateTaskModificationAccess(task, currentUser);
+        Long previousAssigneeId = task.getAssignedTo() != null ? task.getAssignedTo().getUserId() : null;
 
         if (request.getTitle() != null) {
             task.setTitle(request.getTitle());
@@ -289,6 +307,11 @@ public class TaskService {
                 "TASK",
                 updatedTask.getTaskId()
         );
+        if (updatedTask.getAssignedTo() != null
+                && (previousAssigneeId == null
+                || !previousAssigneeId.equals(updatedTask.getAssignedTo().getUserId()))) {
+            notificationService.notifyTaskAssigned(currentUser, updatedTask);
+        }
         return mapToResponse(updatedTask);
     }
 
@@ -382,13 +405,14 @@ public class TaskService {
         }
 
         // Check if user is a team member
-        if (task.getTeam() != null) {
-            return isTeamMember(task.getTeam().getTeamId(), user.getUserId());
+        if (task.getTeam() != null && isTeamMember(task.getTeam().getTeamId(), user.getUserId())) {
+            return true;
         }
 
         // Check if user is the lecturer of the project
-        if (task.getProject() != null && task.getProject().getLecturer() != null) {
-            return task.getProject().getLecturer().getUserId().equals(user.getUserId());
+        if (task.getProject() != null && task.getProject().getLecturer() != null
+                && task.getProject().getLecturer().getUserId().equals(user.getUserId())) {
+            return true;
         }
 
         return false;

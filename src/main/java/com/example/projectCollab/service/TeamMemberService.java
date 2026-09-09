@@ -21,15 +21,18 @@ public class TeamMemberService {
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
+    private final NotificationService notificationService;
 
     public TeamMemberService(TeamMemberRepository teamMemberRepository,
                              TeamRepository teamRepository,
                              UserRepository userRepository,
-                             ActivityService activityService) {
+                             ActivityService activityService,
+                             NotificationService notificationService) {
         this.teamMemberRepository = teamMemberRepository;
         this.teamRepository = teamRepository;
         this.userRepository = userRepository;
         this.activityService = activityService;
+        this.notificationService = notificationService;
     }
 
     // ==========================================
@@ -74,6 +77,7 @@ public class TeamMemberService {
                 "TEAM",
                 team.getTeamId()
         );
+        notificationService.notifyMemberInvited(actor, student, team);
 
         return InvitationResponse.fromEntity(saved);
     }

@@ -36,6 +36,8 @@ public class CommentService {
     private final UserRepository userRepository;
     private final ActivityService activityService;
     private final FileVersionService fileVersionService;
+    private final NotificationService notificationService;
+    private final ProjectAccessService projectAccessService;
 
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -62,7 +64,6 @@ public class CommentService {
         comment.setContent(request.getContent());
         comment.setTask(task);
         comment.setUser(currentUser);
-        comment.setProject(task.getProject());
         comment.setDeleted(false);
 
         if (request.getParentCommentId() != null) {
@@ -114,6 +115,7 @@ public class CommentService {
                 "TASK",
                 taskId
         );
+        notificationService.notifyCommentOnTask(currentUser, task, notificationService.clip(request.getContent()));
 
         return mapToResponse(savedComment);
     }
@@ -154,6 +156,8 @@ public class CommentService {
 
                         // ✅ Set the comment on the file entity
                         fileEntity.setComment(savedComment);
+                        fileEntity.setProject(project);
+                        fileEntity.setCategory(FileCategory.GENERAL);
 
                         // ✅ Save file to database
                         File savedFile = fileRepository.save(fileEntity);
@@ -183,6 +187,7 @@ public class CommentService {
                 "PROJECT",
                 projectId
         );
+        notificationService.notifyCommentOnProject(currentUser, project, notificationService.clip(request.getContent()));
 
         return mapToResponse(savedComment);
     }
@@ -318,6 +323,9 @@ public class CommentService {
                 .orElseThrow(() -> new ResourceNotFoundException("File not found"));
 
         Comment comment = file.getComment();
+        if (comment == null) {
+            throw new ResourceNotFoundException("This file is not attached to a comment");
+        }
 
         // Check if user owns the file or the comment
         boolean isFileOwner = file.getUploadedBy().getUserId().equals(currentUser.getUserId());
@@ -330,7 +338,7 @@ public class CommentService {
         }
 
         // Check if comment is deleted
-        if (comment.isDeleted()) {
+        if (Boolean.TRUE.equals(comment.isDeleted())) {
             throw new RuntimeException("Cannot delete file from a deleted comment");
         }
 
@@ -383,6 +391,25 @@ public class CommentService {
             response.setParentCommentContent(comment.getParentComment().getContent());
         }
 
+        if (comment.getTask() != null) {
+            response.setTaskId(comment.getTask().getTaskId());
+            response.setTaskTitle(comment.getTask().getTitle());
+            if (comment.getTask().getTeam() != null) {
+                response.setTeamId(comment.getTask().getTeam().getTeamId());
+                response.setTeamName(comment.getTask().getTeam().getName());
+            }
+        } else {
+            Project project = comment.getProject();
+            if (project != null && comment.getUser() != null) {
+                Team team = projectAccessService.findUserTeamOnProject(
+                        project.getProjectId(), comment.getUser().getUserId());
+                if (team != null) {
+                    response.setTeamId(team.getTeamId());
+                    response.setTeamName(team.getName());
+                }
+            }
+        }
+
         // Get files for this comment
         List<File> files = fileRepository.findFilesByCommentIdOrderByUploadedAtAsc(comment.getCommentId());
         response.setFiles(files.stream()
@@ -402,7 +429,19 @@ public class CommentService {
         response.setUploadedAt(file.getUploadedAt());
         response.setUploadedBy(file.getUploadedBy().getUserId());
         response.setUploadedByName(file.getUploadedBy().getFirstName() + " " + file.getUploadedBy().getLastName());
-        response.setStorageType(file.getStorageType().name());
+        response.setStorageType(file.getStorageType() != null ? file.getStorageType().name() : "LOCAL");
+        response.setVersionNumber(file.getCurrentVersion());
+        response.setCategory(file.getCategory() != null ? file.getCategory().name() : FileCategory.GENERAL.name());
+        if (file.getProject() != null) {
+            response.setProjectId(file.getProject().getProjectId());
+        }
+        if (file.getTeam() != null) {
+            response.setTeamId(file.getTeam().getTeamId());
+            response.setTeamName(file.getTeam().getName());
+        }
+        if (file.getComment() != null) {
+            response.setCommentId(file.getComment().getCommentId());
+        }
         return response;
     }
 }

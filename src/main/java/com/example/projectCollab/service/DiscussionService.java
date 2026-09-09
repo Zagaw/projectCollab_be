@@ -28,6 +28,7 @@ public class DiscussionService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
+    private final NotificationService notificationService;
 
     private User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -62,6 +63,7 @@ public class DiscussionService {
                 "DISCUSSION",
                 savedDiscussion.getDiscussionId()
         );
+        notificationService.notifyDiscussionEvent(currentUser, project, savedDiscussion, false);
 
         return mapToResponse(savedDiscussion);
     }
@@ -91,6 +93,7 @@ public class DiscussionService {
                 "DISCUSSION",
                 discussionId
         );
+        notificationService.notifyDiscussionEvent(currentUser, discussion.getProject(), discussion, true);
 
         return mapToReplyResponse(savedReply);
     }

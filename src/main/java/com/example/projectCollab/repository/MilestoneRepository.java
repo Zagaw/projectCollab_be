@@ -26,6 +26,9 @@ public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
     @Query("SELECT m FROM Milestone m WHERE m.team.project.lecturer.userId = :lecturerId")
     List<Milestone> findByLecturerId(@Param("lecturerId") Long lecturerId);
 
+    @Query("SELECT DISTINCT m FROM Milestone m JOIN FETCH m.team t JOIN FETCH t.project p LEFT JOIN FETCH m.createdBy WHERE p.lecturer.userId = :lecturerId")
+    List<Milestone> findByLecturerIdWithDetails(@Param("lecturerId") Long lecturerId);
+
     @Query("SELECT m FROM Milestone m WHERE m.createdBy.userId = :userId")
     List<Milestone> findByCreatedBy(@Param("userId") Long userId);
 

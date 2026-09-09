@@ -7,6 +7,7 @@ import com.example.projectCollab.entity.FileVersion;
 import com.example.projectCollab.entity.User;
 import com.example.projectCollab.service.FileStorageService;
 import com.example.projectCollab.service.FileVersionService;
+import com.example.projectCollab.service.ProjectFileService;
 import com.example.projectCollab.util.AuthUtil;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -25,13 +26,16 @@ public class FileController {
 
     private final FileStorageService fileStorageService;
     private final FileVersionService fileVersionService;
+    private final ProjectFileService projectFileService;
     private final AuthUtil authUtil;
 
     public FileController(FileStorageService fileStorageService,
                           FileVersionService fileVersionService,
+                          ProjectFileService projectFileService,
                           AuthUtil authUtil) {
         this.fileStorageService = fileStorageService;
         this.fileVersionService = fileVersionService;
+        this.projectFileService = projectFileService;
         this.authUtil = authUtil;
     }
 
@@ -234,5 +238,14 @@ public class FileController {
             @RequestParam Integer v1,
             @RequestParam Integer v2) {
         return ResponseEntity.ok(fileVersionService.compareVersions(fileId, v1, v2));
+    }
+
+    @DeleteMapping("/{fileId}")
+    public ResponseEntity<Void> deleteFile(
+            @PathVariable Long fileId,
+            Authentication authentication) throws IOException {
+        User currentUser = authUtil.getCurrentUser(authentication);
+        projectFileService.deleteFile(fileId, currentUser);
+        return ResponseEntity.noContent().build();
     }
 }

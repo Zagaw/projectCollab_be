@@ -326,12 +326,18 @@ public class FileVersionService {
     // MAP TO DTO - BREAKS THE CIRCULAR REFERENCE
     // ==========================================
     private void logFileActivity(User user, File file, String action, String description) {
-        if (user == null || file == null || file.getComment() == null) {
+        if (user == null || file == null) {
             return;
         }
-        Project project = file.getComment().getProject();
-        if (project == null && file.getComment().getTask() != null) {
-            project = file.getComment().getTask().getProject();
+        Project project = file.getProject();
+        if (project == null && file.getTeam() != null) {
+            project = file.getTeam().getProject();
+        }
+        if (project == null && file.getComment() != null) {
+            project = file.getComment().getProject();
+            if (project == null && file.getComment().getTask() != null) {
+                project = file.getComment().getTask().getProject();
+            }
         }
         if (project == null) {
             return;

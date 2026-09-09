@@ -66,6 +66,13 @@ public class MilestoneController {
         return ResponseEntity.ok(milestones);
     }
 
+    @GetMapping("/lecturer")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    public ResponseEntity<List<MilestoneResponse>> getLecturerMilestones(Authentication authentication) {
+        Long userId = authUtil.getCurrentUserId(authentication);
+        return ResponseEntity.ok(milestoneService.getMilestonesForLecturer(userId));
+    }
+
     // ==========================================
     // GET MY TEAM MILESTONES (Team Leader only)
     // ==========================================

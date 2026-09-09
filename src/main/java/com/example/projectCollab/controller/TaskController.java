@@ -67,6 +67,12 @@ public class TaskController {
         return ResponseEntity.ok(taskService.getMyAssignedTasks());
     }
 
+    @GetMapping("/lecturer")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    public ResponseEntity<List<TaskResponse>> getLecturerTasks() {
+        return ResponseEntity.ok(taskService.getTasksForLecturer());
+    }
+
     /**
      * Get tasks assigned to a specific student
      * GET /api/tasks/student/{studentId}

@@ -3,8 +3,8 @@ package com.example.projectCollab.service;
 import com.example.projectCollab.dto.MilestoneRequest;
 import com.example.projectCollab.dto.MilestoneResponse;
 import com.example.projectCollab.entity.Milestone;
+import com.example.projectCollab.entity.Role;
 import com.example.projectCollab.entity.Team;
-import com.example.projectCollab.entity.TeamMember;
 import com.example.projectCollab.entity.User;
 import com.example.projectCollab.exception.ResourceNotFoundException;
 import com.example.projectCollab.exception.UnauthorizedAccessException;
@@ -27,17 +27,20 @@ public class MilestoneService {
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
     private final ActivityService activityService;
+    private final NotificationService notificationService;
 
     public MilestoneService(MilestoneRepository milestoneRepository,
                             TeamRepository teamRepository,
                             TeamMemberRepository teamMemberRepository,
                             UserRepository userRepository,
-                            ActivityService activityService) {
+                            ActivityService activityService,
+                            NotificationService notificationService) {
         this.milestoneRepository = milestoneRepository;
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.userRepository = userRepository;
         this.activityService = activityService;
+        this.notificationService = notificationService;
     }
 
     // ==========================================
@@ -75,6 +78,7 @@ public class MilestoneService {
                 "MILESTONE",
                 savedMilestone.getMilestoneId()
         );
+        notificationService.notifyMilestoneCreated(user, team, savedMilestone);
         return convertToResponse(savedMilestone);
     }
 
@@ -97,13 +101,28 @@ public class MilestoneService {
     // GET MILESTONES BY TEAM
     // ==========================================
     public List<MilestoneResponse> getMilestonesByTeam(Long teamId, Long userId) {
-        // Check if user is a member of the team
-        if (!isTeamMember(teamId, userId)) {
-            throw new UnauthorizedAccessException("You are not a member of this team");
+        if (!canViewTeam(teamId, userId)) {
+            throw new UnauthorizedAccessException("You don't have permission to view this team's milestones");
         }
 
         List<Milestone> milestones = milestoneRepository.findByTeam_TeamIdOrderByDeadlineAsc(teamId);
         return milestones.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<MilestoneResponse> getMilestonesForLecturer(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (user.getRole() != Role.LECTURER && user.getRole() != Role.ADMIN) {
+            throw new UnauthorizedAccessException("Only lecturers can view project milestone overview");
+        }
+        return milestoneRepository.findByLecturerIdWithDetails(userId).stream()
+                .sorted((a, b) -> {
+                    if (a.getDeadline() == null) return 1;
+                    if (b.getDeadline() == null) return -1;
+                    return a.getDeadline().compareTo(b.getDeadline());
+                })
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -137,8 +156,8 @@ public class MilestoneService {
     // GET INCOMPLETE MILESTONES
     // ==========================================
     public List<MilestoneResponse> getIncompleteMilestones(Long teamId, Long userId) {
-        if (!isTeamMember(teamId, userId)) {
-            throw new UnauthorizedAccessException("You are not a member of this team");
+        if (!canViewTeam(teamId, userId)) {
+            throw new UnauthorizedAccessException("You don't have permission to view this team's milestones");
         }
 
         List<Milestone> milestones = milestoneRepository
@@ -152,8 +171,8 @@ public class MilestoneService {
     // GET OVERDUE MILESTONES
     // ==========================================
     public List<MilestoneResponse> getOverdueMilestones(Long teamId, Long userId) {
-        if (!isTeamMember(teamId, userId)) {
-            throw new UnauthorizedAccessException("You are not a member of this team");
+        if (!canViewTeam(teamId, userId)) {
+            throw new UnauthorizedAccessException("You don't have permission to view this team's milestones");
         }
 
         List<Milestone> milestones = milestoneRepository
@@ -259,8 +278,8 @@ public class MilestoneService {
     // GET MILESTONE STATISTICS (Team Leader only)
     // ==========================================
     public MilestoneStatistics getMilestoneStatistics(Long teamId, Long userId) {
-        if (!isTeamLeader(teamId, userId)) {
-            throw new UnauthorizedAccessException("Only team leader can view milestone statistics");
+        if (!canViewTeam(teamId, userId)) {
+            throw new UnauthorizedAccessException("You don't have permission to view this team's milestones");
         }
 
         long total = milestoneRepository.count();
@@ -297,13 +316,27 @@ public class MilestoneService {
                team.getTeamLeader().getUserId().equals(userId);
     }
 
-    private boolean hasAccessToMilestone(Milestone milestone, Long userId) {
-        Team team = milestone.getTeam();
-        // Check if user is team leader or team member
-        if (isTeamLeader(team.getTeamId(), userId)) {
+    private boolean canViewTeam(Long teamId, Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return false;
+        }
+        if (user.getRole() == Role.ADMIN) {
             return true;
         }
-        return isTeamMember(team.getTeamId(), userId);
+        Team team = teamRepository.findById(teamId).orElse(null);
+        if (team == null) {
+            return false;
+        }
+        if (team.getProject() != null && team.getProject().getLecturer() != null
+                && team.getProject().getLecturer().getUserId().equals(userId)) {
+            return true;
+        }
+        return isTeamLeader(teamId, userId) || isTeamMember(teamId, userId);
+    }
+
+    private boolean hasAccessToMilestone(Milestone milestone, Long userId) {
+        return canViewTeam(milestone.getTeam().getTeamId(), userId);
     }
 
     private MilestoneResponse convertToResponse(Milestone milestone) {

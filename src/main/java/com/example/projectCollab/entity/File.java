@@ -38,8 +38,20 @@ public class File {
     private Integer currentVersion = 1;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "comment_id", nullable = false)
+    @JoinColumn(name = "comment_id")
     private Comment comment;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id")
+    private Project project;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private Team team;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 20)
+    private FileCategory category = FileCategory.GENERAL;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by", nullable = false)
@@ -54,6 +66,9 @@ public class File {
         uploadedAt = LocalDateTime.now();
         if (currentVersion == null) {
             currentVersion = 1;
+        }
+        if (category == null) {
+            category = FileCategory.GENERAL;
         }
     }
 
@@ -133,6 +148,30 @@ public class File {
 
     public void setComment(Comment comment) {
         this.comment = comment;
+    }
+
+    public Project getProject() {
+        return project;
+    }
+
+    public void setProject(Project project) {
+        this.project = project;
+    }
+
+    public Team getTeam() {
+        return team;
+    }
+
+    public void setTeam(Team team) {
+        this.team = team;
+    }
+
+    public FileCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(FileCategory category) {
+        this.category = category;
     }
 
     public User getUploadedBy() {

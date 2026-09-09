@@ -41,4 +41,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     @Query("SELECT t FROM Task t WHERE t.assignedTo.userId = :userId AND t.deadline < :now AND t.status != 'COMPLETED'")
     List<Task> findOverdueTasksForUser(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+
+    @Query("SELECT DISTINCT t FROM Task t JOIN FETCH t.project p LEFT JOIN FETCH t.team LEFT JOIN FETCH t.assignedTo LEFT JOIN FETCH t.createdBy LEFT JOIN FETCH t.milestone WHERE p.lecturer.userId = :lecturerId")
+    List<Task> findByLecturerIdWithDetails(@Param("lecturerId") Long lecturerId);
 }

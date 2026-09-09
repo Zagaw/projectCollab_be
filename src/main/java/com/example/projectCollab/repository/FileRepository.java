@@ -1,6 +1,7 @@
 package com.example.projectCollab.repository;
 
 import com.example.projectCollab.entity.File;
+import com.example.projectCollab.entity.FileCategory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -28,4 +29,20 @@ public interface FileRepository extends JpaRepository<File, Long> {
 
     @Query("SELECT SUM(f.fileSize) FROM File f WHERE f.comment.commentId = :commentId")
     Optional<Long> sumFileSizesByCommentId(@Param("commentId") Long commentId);
+
+    List<File> findByProject_ProjectIdAndCommentIsNullOrderByUploadedAtDesc(Long projectId);
+
+    List<File> findByProject_ProjectIdAndCategoryAndCommentIsNullOrderByUploadedAtDesc(
+            Long projectId, FileCategory category);
+
+    List<File> findByProject_ProjectIdAndTeam_TeamIdAndCommentIsNullOrderByUploadedAtDesc(
+            Long projectId, Long teamId);
+
+    List<File> findByProject_ProjectIdAndTeam_TeamIdAndCategoryAndCommentIsNullOrderByUploadedAtDesc(
+            Long projectId, Long teamId, FileCategory category);
+
+    List<File> findByTeam_TeamIdAndCommentIsNullOrderByUploadedAtDesc(Long teamId);
+
+    List<File> findByTeam_TeamIdAndCategoryAndCommentIsNullOrderByUploadedAtDesc(
+            Long teamId, FileCategory category);
 }

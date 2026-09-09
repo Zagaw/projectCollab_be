@@ -20,5 +20,9 @@ public class CommentResponse {
     private int replyCount;
     private Long parentCommentId;
     private String parentCommentContent;
+    private Long teamId;
+    private String teamName;
+    private Long taskId;
+    private String taskTitle;
     private List<FileResponse> files;
 }

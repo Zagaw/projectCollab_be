@@ -14,7 +14,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Query("SELECT c FROM Comment c WHERE c.task.taskId = :taskId AND c.isDeleted = false ORDER BY c.createdAt ASC")
     List<Comment> findActiveCommentsByTask(@Param("taskId") Long taskId);
 
-    @Query("SELECT c FROM Comment c WHERE c.project.projectId = :projectId AND c.isDeleted = false ORDER BY c.createdAt ASC")
+    @Query("SELECT c FROM Comment c WHERE c.project.projectId = :projectId AND c.task IS NULL AND c.isDeleted = false ORDER BY c.createdAt ASC")
     List<Comment> findActiveCommentsByProject(@Param("projectId") Long projectId);
 
     @Query("SELECT c FROM Comment c WHERE c.task.taskId = :taskId AND c.parentComment IS NULL AND c.isDeleted = false ORDER BY c.createdAt ASC")

@@ -18,4 +18,10 @@ public class FileResponse {
     private Long uploadedBy;
     private String uploadedByName;
     private String storageType;
+    private Integer versionNumber;
+    private String category;
+    private Long projectId;
+    private Long teamId;
+    private String teamName;
+    private Long commentId;
 }
