@@ -3,6 +3,7 @@ package com.example.projectCollab.service;
 import com.example.projectCollab.dto.FileVersionResponse;
 import com.example.projectCollab.entity.File;
 import com.example.projectCollab.entity.FileVersion;
+import com.example.projectCollab.entity.Project;
 import com.example.projectCollab.entity.User;
 import com.example.projectCollab.exception.FileStorageException;
 import com.example.projectCollab.exception.ResourceNotFoundException;
@@ -31,16 +32,19 @@ public class FileVersionService {
     private final FileVersionRepository fileVersionRepository;
     private final FileRepository fileRepository;
     private final FileHelperService fileHelperService;
+    private final ActivityService activityService;
 
     @Value("${app.file.upload-dir:uploads}")
     private String uploadDir;
 
     public FileVersionService(FileVersionRepository fileVersionRepository,
                               FileRepository fileRepository,
-                              FileHelperService fileHelperService) {
+                              FileHelperService fileHelperService,
+                              ActivityService activityService) {
         this.fileVersionRepository = fileVersionRepository;
         this.fileRepository = fileRepository;
         this.fileHelperService = fileHelperService;
+        this.activityService = activityService;
     }
 
     // ==========================================
@@ -83,11 +87,13 @@ public class FileVersionService {
 
         FileVersion savedVersion = fileVersionRepository.save(version);
 
-        // Update file's current version
         file.setCurrentVersion(newVersionNumber);
         fileRepository.save(file);
 
-        // Return DTO instead of entity
+        logFileActivity(uploadedBy, file, "FILE_VERSION_UPLOADED",
+                uploadedBy.getFirstName() + " " + uploadedBy.getLastName()
+                        + " uploaded version " + newVersionNumber + " of " + file.getFileName());
+
         return mapToResponse(savedVersion);
     }
 
@@ -219,9 +225,12 @@ public class FileVersionService {
 
         FileVersion savedVersion = fileVersionRepository.save(newVersion);
 
-        // Update file's current version
         file.setCurrentVersion(newVersionNumber);
         fileRepository.save(file);
+
+        logFileActivity(rolledBackBy, file, "FILE_VERSION_ROLLBACK",
+                rolledBackBy.getFirstName() + " " + rolledBackBy.getLastName()
+                        + " rolled back " + file.getFileName() + " to version " + versionNumber);
 
         return mapToResponse(savedVersion);
     }
@@ -316,6 +325,20 @@ public class FileVersionService {
     // ==========================================
     // MAP TO DTO - BREAKS THE CIRCULAR REFERENCE
     // ==========================================
+    private void logFileActivity(User user, File file, String action, String description) {
+        if (user == null || file == null || file.getComment() == null) {
+            return;
+        }
+        Project project = file.getComment().getProject();
+        if (project == null && file.getComment().getTask() != null) {
+            project = file.getComment().getTask().getProject();
+        }
+        if (project == null) {
+            return;
+        }
+        activityService.logActivity(user, project, action, description, "FILE", file.getFileId());
+    }
+
     private FileVersionResponse mapToResponse(FileVersion version) {
         FileVersionResponse response = new FileVersionResponse();
         response.setVersionId(version.getVersionId());

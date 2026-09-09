@@ -27,17 +27,17 @@ public class TeamMemberController {
     }
 
     // ==========================================
-    // INVITE STUDENT (Lecturer only)
+    // INVITE STUDENT (Lecturer, Admin, or Team Leader of that team)
     // ==========================================
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'TEAM_LEADER')")
     public ResponseEntity<InvitationResponse> inviteStudent(
             @Valid @RequestBody TeamMemberRequest request,
             Authentication authentication) {
 
-        Long lecturerId = authUtil.getCurrentUserId(authentication);
-        InvitationResponse response = teamMemberService.inviteStudent(request, lecturerId);
+        Long actorId = authUtil.getCurrentUserId(authentication);
+        InvitationResponse response = teamMemberService.inviteStudent(request, actorId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -96,18 +96,18 @@ public class TeamMemberController {
     }
 
     // ==========================================
-    // REMOVE MEMBER (Lecturer only)
+    // REMOVE MEMBER (Lecturer, Admin, or Team Leader of that team)
     // ==========================================
 
     @DeleteMapping("/{teamId}/members/{memberId}")
-    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'TEAM_LEADER')")
     public ResponseEntity<Void> removeMember(
             @PathVariable Long teamId,
             @PathVariable Long memberId,
             Authentication authentication) {
 
-        Long lecturerId = authUtil.getCurrentUserId(authentication);
-        teamMemberService.removeMember(teamId, memberId, lecturerId);
+        Long actorId = authUtil.getCurrentUserId(authentication);
+        teamMemberService.removeMember(teamId, memberId, actorId);
         return ResponseEntity.noContent().build();
     }
 }

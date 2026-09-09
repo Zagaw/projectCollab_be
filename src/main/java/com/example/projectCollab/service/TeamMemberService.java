@@ -20,13 +20,16 @@ public class TeamMemberService {
     private final TeamMemberRepository teamMemberRepository;
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
+    private final ActivityService activityService;
 
     public TeamMemberService(TeamMemberRepository teamMemberRepository,
                              TeamRepository teamRepository,
-                             UserRepository userRepository) {
+                             UserRepository userRepository,
+                             ActivityService activityService) {
         this.teamMemberRepository = teamMemberRepository;
         this.teamRepository = teamRepository;
         this.userRepository = userRepository;
+        this.activityService = activityService;
     }
 
     // ==========================================
@@ -34,24 +37,24 @@ public class TeamMemberService {
     // ==========================================
 
     @Transactional
-    public InvitationResponse inviteStudent(TeamMemberRequest request, Long lecturerId) {
+    public InvitationResponse inviteStudent(TeamMemberRequest request, Long actorId) {
         Team team = teamRepository.findById(request.teamId())
                 .orElseThrow(() -> new RuntimeException("Team not found"));
 
-        // Verify lecturer owns the project
-        if (!team.getProject().getLecturer().getUserId().equals(lecturerId)) {
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!canManageTeamMembers(team, actor)) {
             throw new RuntimeException("You don't have permission to invite students to this team");
         }
 
         User student = userRepository.findById(request.userId())
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        // Check if student is already in the team
         if (teamMemberRepository.existsByTeam_TeamIdAndUser_UserId(request.teamId(), request.userId())) {
             throw new IllegalStateException("Student is already a member of this team");
         }
 
-        // Check if student is a student role
         if (student.getRole() != Role.STUDENT && student.getRole() != Role.TEAM_LEADER) {
             throw new IllegalArgumentException("Only students can be invited to teams");
         }
@@ -62,6 +65,15 @@ public class TeamMemberService {
         teamMember.setStatus(TeamMemberStatus.PENDING);
 
         TeamMember saved = teamMemberRepository.save(teamMember);
+
+        activityService.logActivity(
+                actor,
+                team.getProject(),
+                "MEMBER_INVITED",
+                actorDisplayName(actor) + " invited " + actorDisplayName(student) + " to team " + team.getName(),
+                "TEAM",
+                team.getTeamId()
+        );
 
         return InvitationResponse.fromEntity(saved);
     }
@@ -88,6 +100,17 @@ public class TeamMemberService {
         teamMember.setJoinedAt(LocalDateTime.now());
 
         TeamMember updated = teamMemberRepository.save(teamMember);
+
+        User student = updated.getUser();
+        activityService.logActivity(
+                student,
+                updated.getTeam().getProject(),
+                "INVITATION_ACCEPTED",
+                actorDisplayName(student) + " joined team " + updated.getTeam().getName(),
+                "TEAM",
+                updated.getTeam().getTeamId()
+        );
+
         return TeamResponse.fromEntity(updated.getTeam());
     }
 
@@ -153,19 +176,20 @@ public class TeamMemberService {
     // ==========================================
 
     @Transactional
-    public void removeMember(Long teamId, Long memberId, Long lecturerId) {
+    public void removeMember(Long teamId, Long memberId, Long actorId) {
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new RuntimeException("Team not found"));
 
-        // Verify lecturer owns the project
-        if (!team.getProject().getLecturer().getUserId().equals(lecturerId)) {
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!canManageTeamMembers(team, actor)) {
             throw new RuntimeException("You don't have permission to remove members from this team");
         }
 
         TeamMember member = teamMemberRepository.findById(memberId)
                 .orElseThrow(() -> new RuntimeException("Member not found"));
 
-        // Cannot remove team leader
         if (team.getTeamLeader() != null &&
                 team.getTeamLeader().getUserId().equals(member.getUser().getUserId())) {
             throw new IllegalStateException("Cannot remove the team leader. Assign a new leader first.");
@@ -173,6 +197,31 @@ public class TeamMemberService {
 
         member.setStatus(TeamMemberStatus.REMOVED);
         teamMemberRepository.save(member);
+
+        activityService.logActivity(
+                actor,
+                team.getProject(),
+                "MEMBER_REMOVED",
+                actorDisplayName(actor) + " removed " + actorDisplayName(member.getUser()) + " from team " + team.getName(),
+                "TEAM",
+                team.getTeamId()
+        );
+    }
+
+    private boolean canManageTeamMembers(Team team, User actor) {
+        if (actor.getRole() == Role.ADMIN) {
+            return true;
+        }
+        if (team.getProject().getLecturer() != null
+                && team.getProject().getLecturer().getUserId().equals(actor.getUserId())) {
+            return true;
+        }
+        return team.getTeamLeader() != null
+                && team.getTeamLeader().getUserId().equals(actor.getUserId());
+    }
+
+    private String actorDisplayName(User user) {
+        return user.getFirstName() + " " + user.getLastName();
     }
 
     // ==========================================

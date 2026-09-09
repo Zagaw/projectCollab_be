@@ -20,15 +20,18 @@ public class TeamService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final ActivityService activityService;
 
     public TeamService(TeamRepository teamRepository,
                        ProjectRepository projectRepository,
                        UserRepository userRepository,
-                       TeamMemberRepository teamMemberRepository) {
+                       TeamMemberRepository teamMemberRepository,
+                       ActivityService activityService) {
         this.teamRepository = teamRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.activityService = activityService;
     }
 
     // ==========================================
@@ -56,6 +59,15 @@ public class TeamService {
         team.setProject(project);
 
         Team savedTeam = teamRepository.save(team);
+        User lecturer = project.getLecturer();
+        activityService.logActivity(
+                lecturer,
+                project,
+                "TEAM_CREATED",
+                lecturer.getFirstName() + " " + lecturer.getLastName() + " created team " + savedTeam.getName(),
+                "TEAM",
+                savedTeam.getTeamId()
+        );
         return TeamResponse.fromEntity(savedTeam);
     }
 
@@ -114,6 +126,15 @@ public class TeamService {
         team.setDescription(request.description());
 
         Team updatedTeam = teamRepository.save(team);
+        User lecturer = team.getProject().getLecturer();
+        activityService.logActivity(
+                lecturer,
+                team.getProject(),
+                "TEAM_UPDATED",
+                lecturer.getFirstName() + " " + lecturer.getLastName() + " updated team " + updatedTeam.getName(),
+                "TEAM",
+                updatedTeam.getTeamId()
+        );
         return TeamResponse.fromEntity(updatedTeam);
     }
 
@@ -130,6 +151,17 @@ public class TeamService {
         if (!team.getProject().getLecturer().getUserId().equals(lecturerId)) {
             throw new RuntimeException("You don't have permission to delete this team");
         }
+
+        String teamName = team.getName();
+        User lecturer = team.getProject().getLecturer();
+        activityService.logActivity(
+                lecturer,
+                team.getProject(),
+                "TEAM_DELETED",
+                lecturer.getFirstName() + " " + lecturer.getLastName() + " deleted team " + teamName,
+                "TEAM",
+                team.getTeamId()
+        );
 
         teamRepository.delete(team);
     }
@@ -170,11 +202,22 @@ public class TeamService {
         team.setTeamLeader(user);
         Team updatedTeam = teamRepository.save(team);
 
-        // Update user's role to TEAM_LEADER if they aren't already
         if (user.getRole() != Role.TEAM_LEADER && user.getRole() != Role.ADMIN) {
             user.setRole(Role.TEAM_LEADER);
             userRepository.save(user);
         }
+
+        User lecturer = team.getProject().getLecturer();
+        activityService.logActivity(
+                lecturer,
+                team.getProject(),
+                "TEAM_LEADER_ASSIGNED",
+                lecturer.getFirstName() + " " + lecturer.getLastName()
+                        + " assigned " + user.getFirstName() + " " + user.getLastName()
+                        + " as leader of " + team.getName(),
+                "TEAM",
+                team.getTeamId()
+        );
 
         return TeamResponse.fromEntity(updatedTeam);
     }

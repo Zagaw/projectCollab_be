@@ -26,7 +26,8 @@ public class TaskService {
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final MilestoneRepository milestoneRepository;
-    private final TeamMemberRepository teamMemberRepository;  // Add this
+    private final TeamMemberRepository teamMemberRepository;
+    private final ActivityService activityService;
 
     @Transactional
     public TaskResponse createTask(TaskRequest request) {
@@ -78,6 +79,14 @@ public class TaskService {
         }
 
         Task savedTask = taskRepository.save(task);
+        activityService.logActivity(
+                currentUser,
+                project,
+                "TASK_CREATED",
+                displayName(currentUser) + " created task " + savedTask.getTitle(),
+                "TASK",
+                savedTask.getTaskId()
+        );
         return mapToResponse(savedTask);
     }
 
@@ -272,6 +281,14 @@ public class TaskService {
         }
 
         Task updatedTask = taskRepository.save(task);
+        activityService.logActivity(
+                currentUser,
+                task.getProject(),
+                "TASK_UPDATED",
+                displayName(currentUser) + " updated task " + updatedTask.getTitle(),
+                "TASK",
+                updatedTask.getTaskId()
+        );
         return mapToResponse(updatedTask);
     }
 
@@ -294,6 +311,14 @@ public class TaskService {
             }
 
             Task updatedTask = taskRepository.save(task);
+            activityService.logActivity(
+                    currentUser,
+                    task.getProject(),
+                    "TASK_STATUS_UPDATED",
+                    displayName(currentUser) + " set task " + updatedTask.getTitle() + " to " + newStatus,
+                    "TASK",
+                    updatedTask.getTaskId()
+            );
             return mapToResponse(updatedTask);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid status: " + status +
@@ -314,6 +339,15 @@ public class TaskService {
         if (!isCreator && !isAdminOrLecturer) {
             throw new UnauthorizedAccessException("You are not authorized to delete this task");
         }
+
+        activityService.logActivity(
+                currentUser,
+                task.getProject(),
+                "TASK_DELETED",
+                displayName(currentUser) + " deleted task " + task.getTitle(),
+                "TASK",
+                task.getTaskId()
+        );
 
         taskRepository.delete(task);
     }
@@ -474,6 +508,10 @@ public class TaskService {
         String email = authentication.getName();
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+    }
+
+    private String displayName(User user) {
+        return user.getFirstName() + " " + user.getLastName();
     }
 
     private TaskResponse mapToResponse(Task task) {

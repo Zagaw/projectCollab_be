@@ -19,10 +19,14 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
+    private final ActivityService activityService;
 
-    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository) {
+    public ProjectService(ProjectRepository projectRepository,
+                          UserRepository userRepository,
+                          ActivityService activityService) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
+        this.activityService = activityService;
     }
 
     // ==========================================
@@ -50,6 +54,14 @@ public class ProjectService {
         project.setStatus(ProjectStatus.ACTIVE);
 
         Project savedProject = projectRepository.save(project);
+        activityService.logActivity(
+                lecturer,
+                savedProject,
+                "PROJECT_CREATED",
+                displayName(lecturer) + " created project " + savedProject.getTitle(),
+                "PROJECT",
+                savedProject.getProjectId()
+        );
         return ProjectResponse.fromEntity(savedProject);
     }
 
@@ -112,6 +124,15 @@ public class ProjectService {
         project.setSemester(request.semester());
 
         Project updatedProject = projectRepository.save(project);
+        User lecturer = project.getLecturer();
+        activityService.logActivity(
+                lecturer,
+                updatedProject,
+                "PROJECT_UPDATED",
+                displayName(lecturer) + " updated project " + updatedProject.getTitle(),
+                "PROJECT",
+                updatedProject.getProjectId()
+        );
         return ProjectResponse.fromEntity(updatedProject);
     }
 
@@ -153,7 +174,20 @@ public class ProjectService {
 
         project.setStatus(status);
         Project updatedProject = projectRepository.save(project);
+        User lecturer = project.getLecturer();
+        activityService.logActivity(
+                lecturer,
+                updatedProject,
+                "PROJECT_STATUS_UPDATED",
+                displayName(lecturer) + " set project " + updatedProject.getTitle() + " status to " + status,
+                "PROJECT",
+                updatedProject.getProjectId()
+        );
         return ProjectResponse.fromEntity(updatedProject);
+    }
+
+    private String displayName(User user) {
+        return user.getFirstName() + " " + user.getLastName();
     }
 
     // ==========================================

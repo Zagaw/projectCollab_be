@@ -26,15 +26,18 @@ public class MilestoneService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
+    private final ActivityService activityService;
 
     public MilestoneService(MilestoneRepository milestoneRepository,
                             TeamRepository teamRepository,
                             TeamMemberRepository teamMemberRepository,
-                            UserRepository userRepository) {
+                            UserRepository userRepository,
+                            ActivityService activityService) {
         this.milestoneRepository = milestoneRepository;
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.userRepository = userRepository;
+        this.activityService = activityService;
     }
 
     // ==========================================
@@ -64,6 +67,14 @@ public class MilestoneService {
         milestone.setCreatedBy(user);
 
         Milestone savedMilestone = milestoneRepository.save(milestone);
+        activityService.logActivity(
+                user,
+                team.getProject(),
+                "MILESTONE_CREATED",
+                user.getFirstName() + " " + user.getLastName() + " created milestone " + savedMilestone.getTitle(),
+                "MILESTONE",
+                savedMilestone.getMilestoneId()
+        );
         return convertToResponse(savedMilestone);
     }
 
@@ -175,6 +186,14 @@ public class MilestoneService {
         milestone.setDeadline(request.getDeadline());
 
         Milestone updatedMilestone = milestoneRepository.save(milestone);
+        activityService.logActivity(
+                userRepository.findById(userId).orElse(milestone.getCreatedBy()),
+                milestone.getTeam().getProject(),
+                "MILESTONE_UPDATED",
+                "Milestone updated: " + updatedMilestone.getTitle(),
+                "MILESTONE",
+                updatedMilestone.getMilestoneId()
+        );
         return convertToResponse(updatedMilestone);
     }
 
@@ -200,6 +219,14 @@ public class MilestoneService {
         }
 
         Milestone updatedMilestone = milestoneRepository.save(milestone);
+        activityService.logActivity(
+                userRepository.findById(userId).orElse(milestone.getCreatedBy()),
+                milestone.getTeam().getProject(),
+                "MILESTONE_STATUS_UPDATED",
+                "Milestone " + updatedMilestone.getTitle() + " marked " + (isCompleted ? "completed" : "incomplete"),
+                "MILESTONE",
+                updatedMilestone.getMilestoneId()
+        );
         return convertToResponse(updatedMilestone);
     }
 
@@ -215,6 +242,15 @@ public class MilestoneService {
         if (!isTeamLeader(milestone.getTeam().getTeamId(), userId)) {
             throw new UnauthorizedAccessException("Only team leader can delete milestones");
         }
+
+        activityService.logActivity(
+                userRepository.findById(userId).orElse(milestone.getCreatedBy()),
+                milestone.getTeam().getProject(),
+                "MILESTONE_DELETED",
+                "Milestone deleted: " + milestone.getTitle(),
+                "MILESTONE",
+                milestone.getMilestoneId()
+        );
 
         milestoneRepository.delete(milestone);
     }
