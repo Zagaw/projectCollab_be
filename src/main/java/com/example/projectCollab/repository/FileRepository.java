@@ -45,4 +45,10 @@ public interface FileRepository extends JpaRepository<File, Long> {
 
     List<File> findByTeam_TeamIdAndCategoryAndCommentIsNullOrderByUploadedAtDesc(
             Long teamId, FileCategory category);
+
+    @Query("SELECT f.uploadedBy.userId, COUNT(f) FROM File f WHERE f.team.teamId = :teamId GROUP BY f.uploadedBy.userId")
+    List<Object[]> countByUploaderForTeam(@Param("teamId") Long teamId);
+
+    @Query("SELECT f.uploadedBy.userId, COUNT(f) FROM File f WHERE f.comment.task.team.teamId = :teamId GROUP BY f.uploadedBy.userId")
+    List<Object[]> countByUploaderForTeamTaskComments(@Param("teamId") Long teamId);
 }

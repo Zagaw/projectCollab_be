@@ -16,4 +16,7 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
     List<Discussion> findByProjectAndUser(@Param("projectId") Long projectId, @Param("userId") Long userId);
 
     long countByProjectProjectId(Long projectId);
+
+    @Query("SELECT d.createdBy.userId, COUNT(d) FROM Discussion d WHERE d.project.projectId = :projectId GROUP BY d.createdBy.userId")
+    List<Object[]> countByCreatorForProject(@Param("projectId") Long projectId);
 }

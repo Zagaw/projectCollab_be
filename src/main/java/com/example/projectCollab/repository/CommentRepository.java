@@ -25,4 +25,14 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     @Query("SELECT COUNT(c) FROM Comment c WHERE c.task.taskId = :taskId AND c.isDeleted = false")
     long countActiveByTaskId(@Param("taskId") Long taskId);
+
+    @Query("SELECT c.user.userId, COUNT(c) FROM Comment c " +
+            "WHERE c.isDeleted = false AND c.task.team.teamId = :teamId " +
+            "GROUP BY c.user.userId")
+    List<Object[]> countByUserForTeamTasks(@Param("teamId") Long teamId);
+
+    @Query("SELECT c.user.userId, COUNT(c) FROM Comment c " +
+            "WHERE c.isDeleted = false AND c.task IS NULL AND c.project.projectId = :projectId " +
+            "GROUP BY c.user.userId")
+    List<Object[]> countByUserForProjectComments(@Param("projectId") Long projectId);
 }

@@ -16,6 +16,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByTeamTeamId(Long teamId);
 
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.assignedTo WHERE t.team.teamId = :teamId")
+    List<Task> findByTeamIdWithAssignee(@Param("teamId") Long teamId);
+
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.assignedTo LEFT JOIN FETCH t.team WHERE t.project.projectId = :projectId")
+    List<Task> findByProjectIdWithAssignee(@Param("projectId") Long projectId);
+
     List<Task> findByAssignedToUserId(Long userId);
 
     List<Task> findByProjectProjectIdAndStatus(Long projectId, TaskStatus status);
