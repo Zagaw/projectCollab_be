@@ -166,6 +166,45 @@ public class NotificationService {
         );
     }
 
+    @Transactional
+    public void notifyMeetingScheduled(User actor, Team team, Meeting meeting) {
+        notifyMeetingEvent(actor, team, meeting, "MEETING_SCHEDULED", "Meeting scheduled",
+                displayName(actor) + " scheduled \"" + meeting.getTitle() + "\"");
+    }
+
+    @Transactional
+    public void notifyMeetingUpdated(User actor, Team team, Meeting meeting) {
+        notifyMeetingEvent(actor, team, meeting, "MEETING_UPDATED", "Meeting updated",
+                displayName(actor) + " updated \"" + meeting.getTitle() + "\"");
+    }
+
+    @Transactional
+    public void notifyMeetingCancelled(User actor, Team team, Meeting meeting) {
+        notifyMeetingEvent(actor, team, meeting, "MEETING_CANCELLED", "Meeting cancelled",
+                displayName(actor) + " cancelled \"" + meeting.getTitle() + "\"");
+    }
+
+    @Transactional
+    public void notifyMeetingMinutes(User actor, Team team, Meeting meeting) {
+        notifyMeetingEvent(actor, team, meeting, "MEETING_MINUTES", "Meeting minutes posted",
+                displayName(actor) + " posted minutes for \"" + meeting.getTitle() + "\"");
+    }
+
+    private void notifyMeetingEvent(User actor, Team team, Meeting meeting,
+                                    String type, String title, String message) {
+        Long projectId = team.getProject() != null ? team.getProject().getProjectId() : null;
+        notifyUsers(
+                actor,
+                projectAccessService.getTeamNotifyRecipients(team),
+                type,
+                title,
+                message,
+                "MEETING",
+                meeting.getMeetingId(),
+                projectId
+        );
+    }
+
     @Transactional(readOnly = true)
     public List<NotificationResponse> getMyNotifications(User currentUser, boolean unreadOnly) {
         PageRequest page = PageRequest.of(0, DEFAULT_LIMIT);
