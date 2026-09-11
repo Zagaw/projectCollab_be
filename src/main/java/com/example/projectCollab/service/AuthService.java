@@ -186,8 +186,10 @@ public class AuthService {
                 savedUser.getUserId(),
                 savedUser.getUsername(),
                 savedUser.getEmail(),
+                savedUser.getFirstName(),
+                savedUser.getLastName(),
                 savedUser.getRole().name(),
-                savedUser.getStatus().name()  // Add this 7th parameter
+                savedUser.getStatus().name()
         );
     }
 
@@ -232,6 +234,8 @@ public class AuthService {
                 user.getUserId(),
                 user.getUsername(),
                 user.getEmail(),
+                user.getFirstName(),
+                user.getLastName(),
                 user.getRole().name(),
                 user.getStatus().name()
         );
