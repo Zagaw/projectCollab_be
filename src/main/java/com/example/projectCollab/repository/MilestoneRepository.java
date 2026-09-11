@@ -23,6 +23,22 @@ public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
     @Query("SELECT m FROM Milestone m WHERE m.team.teamId = :teamId AND m.deadline < :now AND m.isCompleted = false")
     List<Milestone> findOverdueMilestones(@Param("teamId") Long teamId, @Param("now") LocalDateTime now);
 
+    @Query("SELECT DISTINCT m FROM Milestone m "
+            + "JOIN FETCH m.team tm "
+            + "LEFT JOIN FETCH tm.teamLeader "
+            + "LEFT JOIN FETCH tm.project p "
+            + "LEFT JOIN FETCH p.lecturer "
+            + "WHERE m.deadline < :now AND m.isCompleted = false")
+    List<Milestone> findOverdueMilestonesWithRelations(@Param("now") LocalDateTime now);
+
+    @Query("SELECT DISTINCT m FROM Milestone m "
+            + "JOIN FETCH m.team tm "
+            + "LEFT JOIN FETCH tm.teamLeader "
+            + "LEFT JOIN FETCH tm.project p "
+            + "LEFT JOIN FETCH p.lecturer "
+            + "WHERE m.deadline >= :now AND m.deadline <= :until AND m.isCompleted = false")
+    List<Milestone> findDueSoonMilestonesWithRelations(@Param("now") LocalDateTime now, @Param("until") LocalDateTime until);
+
     @Query("SELECT m FROM Milestone m WHERE m.team.project.lecturer.userId = :lecturerId")
     List<Milestone> findByLecturerId(@Param("lecturerId") Long lecturerId);
 

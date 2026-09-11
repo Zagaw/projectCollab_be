@@ -12,6 +12,9 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findByProject_ProjectId(Long projectId);
     List<Team> findByTeamLeaderUserId(Long userId);
 
+    @Query("SELECT DISTINCT t FROM Team t JOIN FETCH t.project p LEFT JOIN FETCH p.lecturer LEFT JOIN FETCH t.teamLeader")
+    List<Team> findAllWithProjectAndLeader();
+
     @Query("SELECT t FROM Team t JOIN t.members m WHERE m.user.userId = :userId AND m.status = 'ACTIVE'")
     List<Team> findTeamsByMemberId(@Param("userId") Long userId);
 

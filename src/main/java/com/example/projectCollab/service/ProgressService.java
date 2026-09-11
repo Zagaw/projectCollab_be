@@ -5,6 +5,7 @@ import com.example.projectCollab.dto.ProjectProgressResponse;
 import com.example.projectCollab.dto.TeamProgressResponse;
 import com.example.projectCollab.entity.*;
 import com.example.projectCollab.exception.UnauthorizedAccessException;
+import com.example.projectCollab.insights.DeadlineRules;
 import com.example.projectCollab.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -233,9 +234,7 @@ public class ProgressService {
     }
 
     private boolean isOverdue(Task task) {
-        return task.getStatus() != TaskStatus.COMPLETED
-                && task.getDeadline() != null
-                && task.getDeadline().isBefore(LocalDateTime.now());
+        return DeadlineRules.isTaskOverdue(task, LocalDateTime.now());
     }
 
     private int percent(long completed, long total) {

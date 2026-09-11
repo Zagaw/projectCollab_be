@@ -33,6 +33,28 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT t FROM Task t WHERE t.deadline < :now AND t.status != 'COMPLETED'")
     List<Task> findOverdueTasks(@Param("now") LocalDateTime now);
 
+    @Query("SELECT DISTINCT t FROM Task t "
+            + "LEFT JOIN FETCH t.assignedTo "
+            + "LEFT JOIN FETCH t.team tm "
+            + "LEFT JOIN FETCH tm.teamLeader "
+            + "LEFT JOIN FETCH tm.project tp "
+            + "LEFT JOIN FETCH tp.lecturer "
+            + "LEFT JOIN FETCH t.project p "
+            + "LEFT JOIN FETCH p.lecturer "
+            + "WHERE t.deadline < :now AND t.status != 'COMPLETED'")
+    List<Task> findOverdueTasksWithRelations(@Param("now") LocalDateTime now);
+
+    @Query("SELECT DISTINCT t FROM Task t "
+            + "LEFT JOIN FETCH t.assignedTo "
+            + "LEFT JOIN FETCH t.team tm "
+            + "LEFT JOIN FETCH tm.teamLeader "
+            + "LEFT JOIN FETCH tm.project tp "
+            + "LEFT JOIN FETCH tp.lecturer "
+            + "LEFT JOIN FETCH t.project p "
+            + "LEFT JOIN FETCH p.lecturer "
+            + "WHERE t.deadline >= :now AND t.deadline <= :until AND t.status != 'COMPLETED'")
+    List<Task> findDueSoonTasksWithRelations(@Param("now") LocalDateTime now, @Param("until") LocalDateTime until);
+
     @Query("SELECT COUNT(t) FROM Task t WHERE t.project.projectId = :projectId AND t.status = 'COMPLETED'")
     Long countCompletedTasksByProject(@Param("projectId") Long projectId);
 

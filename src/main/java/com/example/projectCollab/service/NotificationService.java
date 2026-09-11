@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,6 +23,21 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final ProjectAccessService projectAccessService;
+
+    @Transactional
+    public boolean notifyIfAbsent(User recipient, String type, String title, String message,
+                                  String entityType, Long entityId, Long projectId, LocalDateTime since) {
+        if (recipient == null || entityId == null) {
+            return false;
+        }
+        boolean exists = notificationRepository.existsByRecipient_UserIdAndTypeAndEntityIdAndCreatedAtAfter(
+                recipient.getUserId(), type, entityId, since);
+        if (exists) {
+            return false;
+        }
+        notifyUsers(null, List.of(recipient), type, title, fitMessage(message), entityType, entityId, projectId);
+        return true;
+    }
 
     @Transactional
     public void notifyUsers(User actor, List<User> recipients, String type, String title, String message,
@@ -272,5 +288,12 @@ public class NotificationService {
 
     public String clip(String content) {
         return preview(content);
+    }
+
+    private String fitMessage(String message) {
+        if (message == null) {
+            return "";
+        }
+        return message.length() > 500 ? message.substring(0, 497) + "..." : message;
     }
 }

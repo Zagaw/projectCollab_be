@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,4 +34,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Transactional
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.recipient.userId = :userId AND n.isRead = false")
     int markAllReadForUser(@Param("userId") Long userId);
+
+    boolean existsByRecipient_UserIdAndTypeAndEntityIdAndCreatedAtAfter(
+            Long userId, String type, Long entityId, LocalDateTime createdAt);
 }
