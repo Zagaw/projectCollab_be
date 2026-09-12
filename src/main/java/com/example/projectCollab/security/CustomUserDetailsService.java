@@ -1,6 +1,7 @@
 package com.example.projectCollab.security;
 
 import com.example.projectCollab.entity.User;
+import com.example.projectCollab.entity.UserStatus;
 import com.example.projectCollab.repository.UserRepository;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -40,8 +41,8 @@ public class CustomUserDetailsService implements UserDetailsService {
                                 )
                         )
                 )
-                .accountLocked(user.getStatus().name().equals("SUSPENDED"))
-                .disabled(!user.getStatus().name().equals("ACTIVE"))
+                .accountLocked(user.getStatus() == UserStatus.SUSPENDED)
+                .disabled(user.getStatus() == UserStatus.INACTIVE)
                 .build();
     }
 }

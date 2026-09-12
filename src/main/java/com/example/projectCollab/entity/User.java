@@ -131,7 +131,7 @@ public class User {
     }
 
     public void setStudentId(String studentId) {
-        this.studentId = studentId;
+        this.studentId = (studentId == null || studentId.isBlank()) ? null : studentId.trim();
     }
 
     public String getPhone() {
@@ -139,7 +139,7 @@ public class User {
     }
 
     public void setPhone(String phone) {
-        this.phone = phone;
+        this.phone = (phone == null || phone.isBlank()) ? null : phone.trim();
     }
 
     public String getProfileImage() {

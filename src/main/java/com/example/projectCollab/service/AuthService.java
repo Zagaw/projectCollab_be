@@ -11,13 +11,14 @@ import com.example.projectCollab.repository.UserRepository;
 import com.example.projectCollab.security.JwtService;
 
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -46,120 +47,38 @@ public class AuthService {
     public AuthResponse register(
             RegisterRequest request
     ) {
+        String email = request.email() == null ? "" : request.email().trim().toLowerCase();
+        String username = request.username() == null ? "" : request.username().trim();
+        String studentId = blankToNull(request.studentId());
+        String phone = blankToNull(request.phone());
 
-        // Check email
-        if (userRepository.existsByEmail(
-                request.email()
-        )) {
+        Role role = resolveRegisterRole(request.role());
+        UserStatus status = role == Role.LECTURER ? UserStatus.PENDING_VERIFICATION : UserStatus.ACTIVE;
 
-            throw new EmailAlreadyExistsException(
-                    "Email is already registered"
-            );
+        if (role == Role.LECTURER) {
+            studentId = null;
         }
 
-        // Check username
-        if (userRepository.existsByUsername(
-                request.username()
-        )) {
-
-            throw new IllegalArgumentException(
-                    "Username is already taken"
-            );
+        if (userRepository.existsByEmail(email)) {
+            throw new EmailAlreadyExistsException("Email is already registered");
         }
 
-        // Check student ID if provided
-        if (request.studentId() != null &&
-                !request.studentId().isBlank() &&
-                userRepository.existsByStudentId(
-                        request.studentId()
-                )) {
+        if (userRepository.existsByUsername(username)) {
+            throw new IllegalArgumentException("Username is already taken");
+        }
 
-            throw new IllegalArgumentException(
-                    "Student ID is already registered"
-            );
+        if (studentId != null && userRepository.existsByStudentId(studentId)) {
+            throw new IllegalArgumentException("Student ID is already registered");
         }
 
         User user = new User();
-
-        user.setUsername(
-                request.username().trim()
-        );
-
-        user.setEmail(
-                request.email().trim().toLowerCase()
-        );
-
-        user.setPassword(
-                passwordEncoder.encode(
-                        request.password()
-                )
-        );
-
-        user.setFirstName(
-                request.firstName().trim()
-        );
-
-        user.setLastName(
-                request.lastName().trim()
-        );
-
-        user.setStudentId(
-                request.studentId()
-        );
-
-        user.setPhone(
-                request.phone()
-        );
-
-        // IMPORTANT:
-        // Never allow public registration
-        // to choose ADMIN or LECTURER.
-        /*user.setRole(Role.STUDENT);
-
-        user.setStatus(UserStatus.ACTIVE);
-
-        User savedUser =
-                userRepository.save(user);
-        */
-
-        // ==========================================
-        // ROLE HANDLING WITH VERIFICATION
-        // ==========================================
-
-        Role role;
-        UserStatus status;
-
-        // Check if role is provided and valid
-        String requestedRole = request.role();
-
-        if (requestedRole != null && !requestedRole.isBlank()) {
-            try {
-                role = Role.valueOf(requestedRole.toUpperCase());
-
-                // Security: Only allow STUDENT or LECTURER registration
-                // ADMIN and TEAM_LEADER must be assigned by admin
-                if (role == Role.ADMIN) {
-                    throw new IllegalArgumentException("Cannot register as ADMIN. Contact system administrator.");
-                }
-
-                if (role == Role.LECTURER) {
-                    // Lecturers need admin verification
-                    status = UserStatus.PENDING_VERIFICATION;
-                } else {
-                    // Students are active immediately
-                    status = UserStatus.ACTIVE;
-                }
-            } catch (IllegalArgumentException e) {
-                // Invalid role, default to STUDENT
-                role = Role.STUDENT;
-                status = UserStatus.ACTIVE;
-            }
-        } else {
-            // Default to STUDENT if no role provided
-            role = Role.STUDENT;
-            status = UserStatus.ACTIVE;
-        }
-
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setFirstName(request.firstName().trim());
+        user.setLastName(request.lastName().trim());
+        user.setStudentId(studentId);
+        user.setPhone(phone);
         user.setRole(role);
         user.setStatus(status);
 
@@ -201,32 +120,38 @@ public class AuthService {
     public AuthResponse login(
             LoginRequest request
     ) {
+        String email = request.email().trim().toLowerCase();
 
-        Authentication authentication =
-                authenticationManager.authenticate(
-                        new UsernamePasswordAuthenticationToken(
-                                request.email(),
-                                request.password()
-                        )
-                );
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        if (user.getStatus() == UserStatus.INACTIVE) {
+            throw new IllegalStateException("This account is inactive. Contact an administrator.");
+        }
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new IllegalStateException("This account has been suspended. Contact an administrator.");
+        }
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, request.password())
+            );
+        } catch (BadCredentialsException ex) {
+            throw new BadCredentialsException("Invalid email or password");
+        } catch (DisabledException ex) {
+            throw new IllegalStateException("This account is not active. Contact an administrator.");
+        } catch (LockedException ex) {
+            throw new IllegalStateException("This account has been suspended. Contact an administrator.");
+        }
 
         UserDetails userDetails =
-                (UserDetails) authentication.getPrincipal();
+                org.springframework.security.core.userdetails.User
+                        .withUsername(user.getEmail())
+                        .password(user.getPassword())
+                        .authorities("ROLE_" + user.getRole().name())
+                        .build();
 
-        User user =
-                userRepository.findByEmail(
-                                request.email()
-                                        .trim()
-                                        .toLowerCase()
-                        )
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "User not found"
-                                )
-                        );
-
-        String token =
-                jwtService.generateToken(userDetails);
+        String token = jwtService.generateToken(userDetails);
 
         return new AuthResponse(
                 token,
@@ -239,5 +164,28 @@ public class AuthService {
                 user.getRole().name(),
                 user.getStatus().name()
         );
+    }
+
+    private Role resolveRegisterRole(String requestedRole) {
+        if (requestedRole == null || requestedRole.isBlank()) {
+            return Role.STUDENT;
+        }
+        Role role;
+        try {
+            role = Role.valueOf(requestedRole.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return Role.STUDENT;
+        }
+        if (role == Role.ADMIN || role == Role.TEAM_LEADER) {
+            throw new IllegalArgumentException("That role cannot be chosen during sign up.");
+        }
+        return role;
+    }
+
+    private String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }
