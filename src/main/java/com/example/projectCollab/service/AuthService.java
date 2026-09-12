@@ -9,6 +9,7 @@ import com.example.projectCollab.entity.UserStatus;
 import com.example.projectCollab.exception.EmailAlreadyExistsException;
 import com.example.projectCollab.repository.UserRepository;
 import com.example.projectCollab.security.JwtService;
+import com.example.projectCollab.util.PhoneNumbers;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -50,7 +51,7 @@ public class AuthService {
         String email = request.email() == null ? "" : request.email().trim().toLowerCase();
         String username = request.username() == null ? "" : request.username().trim();
         String studentId = blankToNull(request.studentId());
-        String phone = blankToNull(request.phone());
+        String phone = PhoneNumbers.requireValidOrEmpty(request.phone());
 
         Role role = resolveRegisterRole(request.role());
         UserStatus status = role == Role.LECTURER ? UserStatus.PENDING_VERIFICATION : UserStatus.ACTIVE;

@@ -71,6 +71,23 @@ public class NotificationService {
     }
 
     @Transactional
+    public void notifyLecturerVerified(User lecturer) {
+        if (lecturer == null) {
+            return;
+        }
+        notifyUsers(
+                null,
+                List.of(lecturer),
+                "LECTURER_VERIFIED",
+                "Account approved",
+                "An administrator approved your lecturer account. You can now use Collabora.",
+                "USER",
+                lecturer.getUserId(),
+                null
+        );
+    }
+
+    @Transactional
     public void notifyTaskAssigned(User actor, Task task) {
         if (task.getAssignedTo() == null) {
             return;

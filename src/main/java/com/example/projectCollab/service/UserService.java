@@ -5,6 +5,7 @@ import com.example.projectCollab.dto.UserUpdateRequest;
 import com.example.projectCollab.entity.User;
 import com.example.projectCollab.exception.ResourceNotFoundException;
 import com.example.projectCollab.repository.UserRepository;
+import com.example.projectCollab.util.PhoneNumbers;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +47,7 @@ public class UserService {
         user.setEmail(request.email().trim().toLowerCase());
         user.setFirstName(request.firstName().trim());
         user.setLastName(request.lastName().trim());
-        user.setPhone(request.phone());
+        user.setPhone(PhoneNumbers.requireValidOrEmpty(request.phone()));
 
         if (request.profileImage() != null) {
             user.setProfileImage(request.profileImage());

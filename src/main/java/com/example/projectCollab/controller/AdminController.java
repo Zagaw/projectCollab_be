@@ -5,6 +5,7 @@ import com.example.projectCollab.entity.Role;
 import com.example.projectCollab.entity.User;
 import com.example.projectCollab.entity.UserStatus;
 import com.example.projectCollab.repository.UserRepository;
+import com.example.projectCollab.service.NotificationService;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,9 +21,11 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
-    public AdminController(UserRepository userRepository) {
+    public AdminController(UserRepository userRepository, NotificationService notificationService) {
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     // ==========================================
@@ -64,6 +67,7 @@ public class AdminController {
 
         user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
+        notificationService.notifyLecturerVerified(user);
 
         return ResponseEntity.ok(Map.of(
                 "message", "Lecturer verified successfully",
