@@ -206,7 +206,7 @@ public class CommentService {
     // GET COMMENTS FOR PROJECT WITH FILES
     // ==========================================
     public List<CommentResponse> getCommentsForProject(Long projectId) {
-        List<Comment> comments = commentRepository.findActiveCommentsByProject(projectId);
+        List<Comment> comments = commentRepository.findActiveRootCommentsByProject(projectId);
         return comments.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
