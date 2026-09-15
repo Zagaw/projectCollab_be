@@ -20,6 +20,7 @@ public class MilestoneResponse {
     private LocalDateTime updatedAt;
     private Long teamId;
     private String teamName;
+    private Long teamLeaderUserId;
     private Long createdBy;
     private String createdByName;
     private String projectTitle;

@@ -27,6 +27,7 @@ public class TaskResponse {
     // Team info
     private Long teamId;
     private String teamName;
+    private Long teamLeaderUserId;
 
     // Assigned user info
     private Long assignedTo;

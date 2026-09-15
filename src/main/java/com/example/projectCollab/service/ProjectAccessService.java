@@ -87,6 +87,33 @@ public class ProjectAccessService {
         }
     }
 
+    /**
+     * Plan this team's work: admin, the project's lecturer, or this team's leader.
+     * A TEAM_LEADER of another team is not enough.
+     */
+    public boolean canManageTeam(Team team, User user) {
+        if (user == null || team == null) {
+            return false;
+        }
+        if (user.getRole() == Role.ADMIN) {
+            return true;
+        }
+        if (team.getProject() != null
+                && team.getProject().getLecturer() != null
+                && team.getProject().getLecturer().getUserId().equals(user.getUserId())) {
+            return true;
+        }
+        return team.getTeamLeader() != null
+                && team.getTeamLeader().getUserId().equals(user.getUserId());
+    }
+
+    public void requireCanManageTeam(Team team, User user) {
+        if (!canManageTeam(team, user)) {
+            throw new UnauthorizedAccessException(
+                    "Only this team's leader or the project lecturer can manage this team's work");
+        }
+    }
+
     public List<User> getProjectNotifyRecipients(Project project) {
         Map<Long, User> recipients = new LinkedHashMap<>();
         if (project.getLecturer() != null) {

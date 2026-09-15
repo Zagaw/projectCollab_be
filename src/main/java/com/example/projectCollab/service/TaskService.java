@@ -29,6 +29,7 @@ public class TaskService {
     private final TeamMemberRepository teamMemberRepository;
     private final ActivityService activityService;
     private final NotificationService notificationService;
+    private final ProjectAccessService projectAccessService;
 
     @Transactional
     public TaskResponse createTask(TaskRequest request) {
@@ -61,10 +62,12 @@ public class TaskService {
             }
         }
 
-        if (request.getTeamId() != null) {
-            Team team = teamRepository.findById(request.getTeamId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Team", "id", request.getTeamId()));
+        Team team = resolveTaskTeam(request, project);
+        if (team != null) {
+            projectAccessService.requireCanManageTeam(team, currentUser);
             task.setTeam(team);
+        } else {
+            requireLecturerOrAdminOfProject(project, currentUser);
         }
 
         if (request.getAssignedTo() != null) {
@@ -76,6 +79,9 @@ public class TaskService {
         if (request.getMilestoneId() != null) {
             Milestone milestone = milestoneRepository.findById(request.getMilestoneId())
                     .orElseThrow(() -> new ResourceNotFoundException("Milestone", "id", request.getMilestoneId()));
+            if (team == null || !milestone.getTeam().getTeamId().equals(team.getTeamId())) {
+                throw new IllegalArgumentException("Milestone does not belong to the selected team");
+            }
             task.setMilestone(milestone);
         }
 
@@ -250,7 +256,7 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
         User currentUser = getCurrentUser();
-        validateTaskModificationAccess(task, currentUser);
+        requireCanManageTask(task, currentUser);
         Long previousAssigneeId = task.getAssignedTo() != null ? task.getAssignedTo().getUserId() : null;
 
         if (request.getTitle() != null) {
@@ -355,13 +361,7 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task", "id", taskId));
 
         User currentUser = getCurrentUser();
-
-        boolean isCreator = task.getCreatedBy().getUserId().equals(currentUser.getUserId());
-        boolean isAdminOrLecturer = currentUser.getRole() == Role.ADMIN || currentUser.getRole() == Role.LECTURER;
-
-        if (!isCreator && !isAdminOrLecturer) {
-            throw new UnauthorizedAccessException("You are not authorized to delete this task");
-        }
+        requireCanManageTask(task, currentUser);
 
         activityService.logActivity(
                 currentUser,
@@ -486,19 +486,51 @@ public class TaskService {
         return teamMemberRepository.findByTeam_TeamIdAndUser_UserId(teamId, userId).isPresent();
     }
 
-    /**
-     * Validate access for task modification (update full task)
-     * - User is the creator OR
-     * - User is the lecturer OR
-     * - User is admin
-     */
-    private void validateTaskModificationAccess(Task task, User user) {
-        boolean isCreator = task.getCreatedBy().getUserId().equals(user.getUserId());
-        boolean isAdminOrLecturer = user.getRole() == Role.ADMIN || user.getRole() == Role.LECTURER;
-
-        if (!isCreator && !isAdminOrLecturer) {
-            throw new UnauthorizedAccessException("You are not authorized to modify this task");
+    private Team resolveTaskTeam(TaskRequest request, Project project) {
+        if (request.getMilestoneId() != null) {
+            Milestone milestone = milestoneRepository.findById(request.getMilestoneId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Milestone", "id", request.getMilestoneId()));
+            Team milestoneTeam = milestone.getTeam();
+            if (milestoneTeam == null || milestoneTeam.getProject() == null
+                    || !milestoneTeam.getProject().getProjectId().equals(project.getProjectId())) {
+                throw new IllegalArgumentException("Milestone does not belong to this project");
+            }
+            if (request.getTeamId() != null && !request.getTeamId().equals(milestoneTeam.getTeamId())) {
+                throw new IllegalArgumentException("Milestone does not belong to the selected team");
+            }
+            return milestoneTeam;
         }
+        if (request.getTeamId() == null) {
+            return null;
+        }
+        Team team = teamRepository.findById(request.getTeamId())
+                .orElseThrow(() -> new ResourceNotFoundException("Team", "id", request.getTeamId()));
+        if (team.getProject() == null || !team.getProject().getProjectId().equals(project.getProjectId())) {
+            throw new IllegalArgumentException("Team does not belong to this project");
+        }
+        return team;
+    }
+
+    private void requireLecturerOrAdminOfProject(Project project, User user) {
+        if (user.getRole() == Role.ADMIN) {
+            return;
+        }
+        if (project.getLecturer() != null && project.getLecturer().getUserId().equals(user.getUserId())) {
+            return;
+        }
+        throw new UnauthorizedAccessException("Select a team you lead, or ask the lecturer to create this task");
+    }
+
+    /**
+     * Edit/delete a task: this team's leader, the project lecturer, or admin.
+     * A TEAM_LEADER of another team is not enough.
+     */
+    private void requireCanManageTask(Task task, User user) {
+        if (task.getTeam() != null) {
+            projectAccessService.requireCanManageTeam(task.getTeam(), user);
+            return;
+        }
+        requireLecturerOrAdminOfProject(task.getProject(), user);
     }
 
     /**
@@ -564,6 +596,9 @@ public class TaskService {
         if (task.getTeam() != null) {
             response.setTeamId(task.getTeam().getTeamId());
             response.setTeamName(task.getTeam().getName());
+            if (task.getTeam().getTeamLeader() != null) {
+                response.setTeamLeaderUserId(task.getTeam().getTeamLeader().getUserId());
+            }
         }
 
         if (task.getAssignedTo() != null) {

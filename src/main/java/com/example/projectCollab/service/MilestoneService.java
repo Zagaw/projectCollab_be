@@ -351,6 +351,9 @@ public class MilestoneService {
         response.setUpdatedAt(milestone.getUpdatedAt());
         response.setTeamId(milestone.getTeam().getTeamId());
         response.setTeamName(milestone.getTeam().getName());
+        if (milestone.getTeam().getTeamLeader() != null) {
+            response.setTeamLeaderUserId(milestone.getTeam().getTeamLeader().getUserId());
+        }
         response.setCreatedBy(milestone.getCreatedBy().getUserId());
         response.setCreatedByName(milestone.getCreatedBy().getFirstName() + " " + 
                                  milestone.getCreatedBy().getLastName());
