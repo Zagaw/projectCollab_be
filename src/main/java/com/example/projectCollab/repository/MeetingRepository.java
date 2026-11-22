@@ -1,11 +1,13 @@
 package com.example.projectCollab.repository;
 
 import com.example.projectCollab.entity.Meeting;
+import com.example.projectCollab.entity.MeetingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,4 +25,19 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long> {
 
     @Query("SELECT m FROM Meeting m JOIN FETCH m.team t JOIN FETCH t.project p LEFT JOIN FETCH t.teamLeader LEFT JOIN FETCH m.createdBy WHERE m.meetingId = :meetingId")
     Optional<Meeting> findByIdWithDetails(@Param("meetingId") Long meetingId);
+
+    @Query("""
+            SELECT DISTINCT m FROM Meeting m
+            JOIN FETCH m.team t
+            JOIN FETCH t.project p
+            LEFT JOIN FETCH t.teamLeader
+            WHERE m.status = :status
+              AND m.startAt > :now
+              AND m.startAt <= :until
+            ORDER BY m.startAt ASC
+            """)
+    List<Meeting> findScheduledStartingBetween(
+            @Param("status") MeetingStatus status,
+            @Param("now") LocalDateTime now,
+            @Param("until") LocalDateTime until);
 }

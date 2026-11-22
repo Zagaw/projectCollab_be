@@ -223,6 +223,31 @@ public class NotificationService {
                 displayName(actor) + " posted minutes for \"" + meeting.getTitle() + "\"");
     }
 
+    @Transactional
+    public int notifyMeetingStartingSoon(Meeting meeting, List<User> recipients, LocalDateTime since) {
+        if (meeting == null || recipients == null || recipients.isEmpty()) {
+            return 0;
+        }
+        Long projectId = meeting.getTeam() != null && meeting.getTeam().getProject() != null
+                ? meeting.getTeam().getProject().getProjectId()
+                : null;
+        int created = 0;
+        for (User recipient : recipients) {
+            if (notifyIfAbsent(
+                    recipient,
+                    "MEETING_REMINDER",
+                    "Meeting starts in 15 minutes",
+                    reminderMessage(meeting),
+                    "MEETING",
+                    meeting.getMeetingId(),
+                    projectId,
+                    since)) {
+                created += 1;
+            }
+        }
+        return created;
+    }
+
     private void notifyMeetingEvent(User actor, Team team, Meeting meeting,
                                     String type, String title, String message) {
         Long projectId = team.getProject() != null ? team.getProject().getProjectId() : null;
@@ -312,5 +337,21 @@ public class NotificationService {
             return "";
         }
         return message.length() > 500 ? message.substring(0, 497) + "..." : message;
+    }
+
+    private String reminderMessage(Meeting meeting) {
+        String title = meeting.getTitle() == null || meeting.getTitle().isBlank()
+                ? "Untitled meeting"
+                : meeting.getTitle().trim();
+        String teamName = meeting.getTeam() != null && meeting.getTeam().getName() != null
+                ? meeting.getTeam().getName()
+                : "your team";
+        String when = meeting.getStartAt() == null
+                ? "soon"
+                : meeting.getStartAt().format(java.time.format.DateTimeFormatter.ofPattern("h:mm a, d MMM yyyy"));
+        String place = meeting.getLocation() != null && !meeting.getLocation().isBlank()
+                ? " at " + meeting.getLocation().trim()
+                : "";
+        return "\"" + title + "\" for " + teamName + " starts at " + when + place + ".";
     }
 }
